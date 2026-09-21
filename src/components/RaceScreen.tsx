@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Button, Typography, Tag } from 'antd';
+import { Button, Typography, Tag, Tooltip } from 'antd';
 import { useGameStore } from '../store/gameStore';
 import { getCharacter } from '../data/characters';
 import ActionLog from './ActionLog';
@@ -16,11 +16,38 @@ function hazardIcon(effect?: { type: string; delta?: number }) {
   return null;
 }
 
+/** Short always-visible badge text for a hazard, e.g. "TRIP", "★ +1", "+3", "-2". */
 function hazardLabel(effect?: { type: string; delta?: number }) {
   if (!effect) return null;
-  if (effect.type === 'star') return '1';
-  if (effect.type === 'arrow') return `${Math.abs(effect.delta ?? 0)}`;
+  if (effect.type === 'rock') return 'TRIP';
+  if (effect.type === 'star') return '★ +1';
+  if (effect.type === 'arrow') {
+    const delta = effect.delta ?? 0;
+    return delta > 0 ? `+${delta}` : `${delta}`;
+  }
   return null;
+}
+
+/** Consistent color per effect type so the same effect always reads the same color at a glance. */
+function hazardColor(effect?: { type: string; delta?: number }): string | undefined {
+  if (!effect) return undefined;
+  if (effect.type === 'rock') return '#ef4444';
+  if (effect.type === 'star') return '#eab308';
+  if (effect.type === 'arrow') return (effect.delta ?? 0) > 0 ? '#22c55e' : '#6366f1';
+  return undefined;
+}
+
+function hazardTooltip(effect?: { type: string; delta?: number }): string {
+  if (!effect) return 'Plain space — no effect.';
+  if (effect.type === 'rock') return '🪨 Trip! Landing here trips this racer — they skip their next turn.';
+  if (effect.type === 'star') return '⭐ Star! Landing here earns a bonus point (bronze chip) at game end.';
+  if (effect.type === 'arrow') {
+    const delta = effect.delta ?? 0;
+    return delta > 0
+      ? `➡️ Arrow! Landing here moves the racer forward ${delta} more space${delta === 1 ? '' : 's'}.`
+      : `⬅️ Arrow! Landing here moves the racer backward ${Math.abs(delta)} space${Math.abs(delta) === 1 ? '' : 's'}.`;
+  }
+  return '';
 }
 
 export default function RaceScreen() {
@@ -41,14 +68,19 @@ export default function RaceScreen() {
   const dicemongerCharacterId = Object.keys(racers).find((id) => getCharacter(id).id === 'dicemonger');
   const hasDicemonger = !!dicemongerCharacterId && !racers[dicemongerCharacterId]?.finished;
 
-  const racersByPosition = new Map<number, string[]>();
-  for (const cid of turnOrder) {
-    const r = racers[cid];
-    if (!r || r.finished) continue;
-    const list = racersByPosition.get(r.position) ?? [];
-    list.push(cid);
-    racersByPosition.set(r.position, list);
-  }
+  // Each racer keeps a fixed lane (row) for the whole race, based on their
+  // stable position in turnOrder, so they're always easy to track visually
+  // even when several racers share the same space.
+  const laneIndexById = new Map<string, number>();
+  turnOrder.forEach((cid, i) => laneIndexById.set(cid, i));
+  const laneCount = Math.max(1, turnOrder.length);
+  const laneHeight = 34;
+  const laneTopOffset = 16;
+  const trackLaneHeight = laneTopOffset * 2 + laneHeight * (laneCount - 1) + 30;
+
+  // Tiles are laid out over (length + 1) slots (index 0..length); center each
+  // racer within its tile rather than pinning it to the tile's left edge.
+  const tileUnit = 100 / (track.length + 1);
 
   return (
     <div className="race-screen">
@@ -57,44 +89,60 @@ export default function RaceScreen() {
       </Title>
 
       <div className="track-wrapper">
-        <div className="track-lane">
+        <p className="track-hint">
+          💡 Hover any space to see what it does, or hover a racer to see its ability.
+        </p>
+        <div className="track-lane" style={{ height: trackLaneHeight }}>
           {track.spaces.map((space) => (
-            <div
-              key={space.index}
-              className={`track-space${space.effect ? ' track-space-hazard' : ''}`}
-              style={{
-                left: `${(space.index / track.length) * 100}%`,
-                width: `${(1 / (track.length + 1)) * 100}%`,
-                background: space.effect ? undefined : space.color,
-              }}
-            >
-              {space.index === track.length && <span className="finish-flag">🏁</span>}
-              {space.effect && (
-                <span className="hazard-icon">
-                  {hazardIcon(space.effect)}
-                  {hazardLabel(space.effect) && <span className="hazard-label">{hazardLabel(space.effect)}</span>}
-                </span>
-              )}
-            </div>
+            <Tooltip key={space.index} title={hazardTooltip(space.effect)} mouseEnterDelay={0.15}>
+              <div
+                className={`track-space${space.effect ? ' track-space-hazard' : ''}`}
+                style={{
+                  left: `${space.index * tileUnit}%`,
+                  width: `${tileUnit}%`,
+                  background: space.effect ? hazardColor(space.effect) : space.color,
+                }}
+              >
+                {space.index === track.length && <span className="finish-flag">🏁</span>}
+                {space.effect && (
+                  <span className="effect-badge">
+                    <span className="effect-badge-icon">{hazardIcon(space.effect)}</span>
+                    <span className="effect-badge-label">{hazardLabel(space.effect)}</span>
+                  </span>
+                )}
+              </div>
+            </Tooltip>
           ))}
-          {[...racersByPosition.entries()].map(([position, cids]) =>
-            cids.map((cid, stackIndex) => {
-              const racer = racers[cid];
-              const owner = players.find((p) => p.id === racer.ownerId);
-              const leftPct = (position / track.length) * 100;
-              return (
+          {turnOrder.map((cid) => {
+            const racer = racers[cid];
+            if (!racer || racer.finished) return null;
+            const owner = players.find((p) => p.id === racer.ownerId);
+            const character = getCharacter(cid);
+            const leftPct = (racer.position + 0.5) * tileUnit;
+            const lane = laneIndexById.get(cid) ?? 0;
+            return (
+              <Tooltip
+                key={cid}
+                title={
+                  <>
+                    <strong>
+                      {character.name} ({owner?.name})
+                    </strong>
+                    <div>{character.description}</div>
+                  </>
+                }
+                mouseEnterDelay={0.15}
+              >
                 <motion.div
-                  key={cid}
                   className={`racer-token${racer.tripped ? ' tripped' : ''}${cid === activeCharacterId ? ' active' : ''}`}
-                  animate={{ left: `${leftPct}%`, top: 20 + stackIndex * 34 }}
+                  animate={{ left: `${leftPct}%`, top: laneTopOffset + lane * laneHeight }}
                   transition={{ type: 'spring', stiffness: 120, damping: 18 }}
-                  title={`${getCharacter(cid).name} (${owner?.name})`}
                 >
                   <CharacterIcon characterId={cid} size={28} />
                 </motion.div>
-              );
-            }),
-          )}
+              </Tooltip>
+            );
+          })}
         </div>
       </div>
 
@@ -124,6 +172,14 @@ export default function RaceScreen() {
             {activeOwner?.isHuman ? 'Roll Die' : `Next → (${activeOwner?.name})`}
           </Button>
         </div>
+      </div>
+
+      <div className="log-legend">
+        <span className="log-legend-title">Track legend:</span>
+        <span className="legend-swatch" style={{ background: '#ef4444' }} /> TRIP
+        <span className="legend-swatch" style={{ background: '#eab308' }} /> ★ +1 point
+        <span className="legend-swatch" style={{ background: '#22c55e' }} /> Move forward
+        <span className="legend-swatch" style={{ background: '#6366f1' }} /> Move backward
       </div>
 
       <div className="log-legend">
