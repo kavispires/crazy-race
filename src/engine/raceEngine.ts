@@ -1,12 +1,13 @@
 import { v4 as uuid } from 'uuid';
 import type { AbilityContext, Character, LogEntry, LogKind, Player, RacerState, Track } from '../types';
-import { getCharacter } from '../data/characters';
+import { getCharacter, CHARACTER_MAP } from '../data/characters';
 import { aiDecide } from '../ai/ai';
 
 export interface RaceRuntimeCallbacks {
   onLog: (entry: LogEntry) => void;
   onRacersChange: (racers: Record<string, RacerState>) => void;
   onStarCollected: (characterId: string) => void;
+  onStarRemoved: (characterId: string) => void;
   /** Pause the turn and wait for a human to answer via the UI. */
   requestHumanDecision: (
     characterId: string,
@@ -15,6 +16,8 @@ export interface RaceRuntimeCallbacks {
   ) => Promise<string>;
   /** Small artificial delay so AI moves are visible to the player. */
   delay: (ms: number) => Promise<void>;
+  /** Requests that `characterId` take the very next turn, ahead of normal turn order. */
+  requestPriorityTurn: (characterId: string) => void;
 }
 
 export interface RaceRuntime {
@@ -26,6 +29,12 @@ export interface RaceRuntime {
   finishedCharacterIds: string[];
   eliminatedCharacterIds: string[];
   rerollUsedThisTurn: boolean;
+  /** Free-form per-character scratch space that persists for the whole race. */
+  custom: Record<string, Record<string, unknown>>;
+  /** Base character ids that won a previous race this game (for Twin). */
+  previousWinnerBaseIds: string[];
+  /** Set by a reactive ability (e.g. Inchworm) to cancel the active racer's pending move this turn. */
+  pendingMoveCancelled: boolean;
 }
 
 export function createInitialRacers(characterIdToOwner: Record<string, string>): Record<string, RacerState> {
@@ -51,6 +60,35 @@ function character(id: string): Character {
   return getCharacter(id);
 }
 
+/**
+ * Resolves the *effective* character used for ability-hook dispatch. Normally
+ * this is just the racer's own character, but a few racers borrow another
+ * character's abilities for the whole race:
+ *  - Copy Cat dynamically mirrors whoever is currently in the lead.
+ *  - Egg / Twin pick a fixed ability at race setup (stored in `runtime.custom`).
+ */
+export function effectiveCharacter(runtime: RaceRuntime, characterId: string): Character {
+  const own = character(characterId);
+  const borrowedBaseId = runtime.custom[characterId]?.borrowedBaseId as string | undefined;
+  if (borrowedBaseId && CHARACTER_MAP[borrowedBaseId]) {
+    return { ...own, abilities: CHARACTER_MAP[borrowedBaseId].abilities };
+  }
+  if (own.id === 'copy-cat') {
+    const active = Object.values(runtime.racers).filter((r) => !r.finished && r.characterId !== characterId);
+    if (active.length > 0) {
+      const leadPosition = Math.max(...active.map((r) => r.position));
+      const leaders = active.filter((r) => r.position === leadPosition);
+      // Deterministic tie-break: earliest in the racer map's insertion order.
+      const leader = leaders[0];
+      const leaderCharacter = character(leader.characterId);
+      if (leaderCharacter.id !== 'copy-cat') {
+        return { ...own, abilities: leaderCharacter.abilities };
+      }
+    }
+  }
+  return own;
+}
+
 /** Builds the AbilityContext bound to a specific runtime, wiring up chain-reaction notifications. */
 export function buildContext(runtime: RaceRuntime): AbilityContext {
   const describe = (characterId: string) => {
@@ -67,8 +105,20 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
   const notifyAbilityResolve = (triggerId: string) => {
     for (const racer of Object.values(runtime.racers)) {
       if (racer.characterId === triggerId || racer.finished) continue;
-      const abilities = character(racer.characterId).abilities;
+      const abilities = effectiveCharacter(runtime, racer.characterId).abilities;
       abilities.onAbilityResolve?.(ctx, triggerId, racer.characterId);
+    }
+  };
+
+  const checkMastermindPrediction = (finishedCharacterId: string) => {
+    for (const [mmId, data] of Object.entries(runtime.custom)) {
+      if (data?.mastermindPredictedWinner !== finishedCharacterId) continue;
+      const mmRacer = runtime.racers[mmId];
+      if (!mmRacer || mmRacer.finished) continue;
+      mmRacer.finished = true;
+      mmRacer.finishOrder = runtime.finishOrderCounter++;
+      runtime.finishedCharacterIds.push(mmId);
+      log(`♟️ ${describe(mmId)} correctly predicted the winner and claims 2nd place, ending the race!`, 'finish');
     }
   };
 
@@ -76,10 +126,64 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
     const racer = runtime.racers[characterId];
     if (!racer || racer.finished) return;
     const from = racer.position;
+
+    // Racers sharing the mover's space before it departs (for Suckerfish).
+    const stationaryAtFrom = Object.values(runtime.racers).filter(
+      (r) => r.characterId !== characterId && !r.finished && r.position === from,
+    );
+
     let to = from + delta;
     if (to < 0) to = 0;
 
-    const forward = delta > 0;
+    // Stickler: other racers can't overshoot the finish line, only land exactly.
+    if (to > runtime.track.length) {
+      const sticklerBlocking = Object.values(runtime.racers).some(
+        (r) => r.characterId !== characterId && !r.finished && effectiveCharacter(runtime, r.characterId).abilities.blocksOvershoot,
+      );
+      if (sticklerBlocking) {
+        log(`🤓 ${describe(characterId)} overshoots the finish and doesn't move (must land exactly)!`, 'hazard');
+        return;
+      }
+    }
+
+    // Leaptoad: skip over any space currently occupied by another racer.
+    if (effectiveCharacter(runtime, characterId).abilities.skipOccupiedSpaces && !opts?.silent && delta !== 0) {
+      const dir = delta > 0 ? 1 : -1;
+      let steps = Math.abs(delta);
+      let pos = from;
+      while (steps > 0) {
+        pos += dir;
+        if (pos <= 0) {
+          pos = 0;
+          break;
+        }
+        if (pos >= runtime.track.length) {
+          pos = runtime.track.length;
+          break;
+        }
+        const occupied = Object.values(runtime.racers).some(
+          (r) => r.characterId !== characterId && !r.finished && r.position === pos,
+        );
+        if (!occupied) steps--;
+      }
+      to = pos;
+    }
+
+    // Huge Baby: redirect anyone who'd land on its space (except the start line).
+    if (to !== 0) {
+      for (const other of Object.values(runtime.racers)) {
+        if (other.characterId === characterId || other.finished) continue;
+        const adjusted = await effectiveCharacter(runtime, other.characterId).abilities.adjustLanding?.(
+          ctx,
+          other.characterId,
+          characterId,
+          to,
+        );
+        if (adjusted !== undefined) to = Math.max(0, Math.min(adjusted, runtime.track.length));
+      }
+    }
+
+    const forward = to > from;
     const passedCharacterIds = Object.values(runtime.racers)
       .filter((r) => r.characterId !== characterId && !r.finished)
       .filter((r) => (forward ? r.position > from && r.position < to : r.position < from && r.position > to))
@@ -90,12 +194,23 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
 
     if (!opts?.silent) {
       for (const otherId of passedCharacterIds) {
-        const selfAbilities = character(characterId).abilities;
-        const otherAbilities = character(otherId).abilities;
+        const selfAbilities = effectiveCharacter(runtime, characterId).abilities;
+        const otherAbilities = effectiveCharacter(runtime, otherId).abilities;
         await selfAbilities.onPass?.(ctx, characterId, otherId);
         notifyAbilityResolve(characterId);
         await otherAbilities.onPassedBy?.(ctx, otherId, characterId);
         notifyAbilityResolve(otherId);
+      }
+
+      // Suckerfish: racers left behind at the old space may follow to the new one.
+      for (const stayer of stationaryAtFrom) {
+        if (stayer.finished || stayer.position !== from) continue;
+        await effectiveCharacter(runtime, stayer.characterId).abilities.onSharedDeparture?.(
+          ctx,
+          stayer.characterId,
+          characterId,
+        );
+        notifyAbilityResolve(stayer.characterId);
       }
     }
 
@@ -107,6 +222,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       const place = racer.finishOrder === 0 ? '1st 🥇' : racer.finishOrder === 1 ? '2nd 🥈' : `#${racer.finishOrder + 1}`;
       log(`🏁 ${describe(characterId)} crosses the finish line in ${place} place!`, 'finish');
       runtime.callbacks.onRacersChange({ ...runtime.racers });
+      if (racer.finishOrder === 0) checkMastermindPrediction(characterId);
       return;
     }
 
@@ -127,15 +243,31 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       }
     }
 
-    // Shared-space resolution.
+    // Shared-space resolution (fires for both racers involved, plus third parties).
     if (!opts?.silent) {
       const sharing = Object.values(runtime.racers).filter(
         (r) => r.characterId !== characterId && !r.finished && r.position === racer.position,
       );
       for (const other of sharing) {
-        const selfAbilities = character(characterId).abilities;
+        const selfAbilities = effectiveCharacter(runtime, characterId).abilities;
+        const otherAbilities = effectiveCharacter(runtime, other.characterId).abilities;
         await selfAbilities.onShareSpace?.(ctx, characterId, other.characterId);
         notifyAbilityResolve(characterId);
+        await otherAbilities.onShareSpace?.(ctx, other.characterId, characterId);
+        notifyAbilityResolve(other.characterId);
+      }
+      if (sharing.length === 1) {
+        const otherId = sharing[0].characterId;
+        for (const third of Object.values(runtime.racers)) {
+          if (third.finished || third.characterId === characterId || third.characterId === otherId) continue;
+          await effectiveCharacter(runtime, third.characterId).abilities.onAnyShareSpace?.(
+            ctx,
+            third.characterId,
+            characterId,
+            otherId,
+          );
+          notifyAbilityResolve(third.characterId);
+        }
       }
     }
 
@@ -188,6 +320,14 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
     },
     isHazardTrack: runtime.track.hazardous,
     trackLength: runtime.track.length,
+    custom: runtime.custom,
+    grantBronzeChip: (characterId) => runtime.callbacks.onStarCollected(characterId),
+    removeBronzeChip: (characterId) => runtime.callbacks.onStarRemoved(characterId),
+    cancelPendingMove: () => {
+      runtime.pendingMoveCancelled = true;
+    },
+    requestPriorityTurn: (characterId) => runtime.callbacks.requestPriorityTurn(characterId),
+    getPreviousWinnerBaseIds: () => runtime.previousWinnerBaseIds,
   };
 
   return ctx;

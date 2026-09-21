@@ -35,11 +35,8 @@ Open the printed local URL in your browser.
 ## Customizing racer art (SVG icons)
 
 Racer tokens and character cards render `public/racers/<character-id>.svg`. To swap in your own
-art, just drop a same-named SVG file into `public/racers/` — no code changes needed. The 12
-character ids are:
-
-`alchemist`, `banana`, `centaur`, `cheerleader`, `coach`, `dicemonger`, `duelist`, `gunk`,
-`heckler`, `mouth`, `rocket-scientist`, `scoocher`
+art, just drop a same-named SVG file into `public/racers/` — no code changes needed. The full
+36-character roster's ids are the `id` field of each entry in `src/data/characters.ts`.
 
 Recommended size is a square viewBox (e.g. `0 0 64 64`); the app scales it to fit automatically.
 If a file is missing, the UI falls back to a plain circle with the character's initial, so you can
@@ -48,7 +45,7 @@ replace them one at a time. See `src/components/CharacterIcon.tsx` for the rende
 ## Project structure
 
 - `src/types` — shared domain types (characters, tracks, racers, abilities).
-- `src/data` — the 12 starter characters and the 4 race tracks.
+- `src/data` — the 36-character roster and the 4 race tracks.
 - `src/engine` — the ability/turn resolution engine (movement, passing, hazards, chain reactions).
 - `src/ai` — AI heuristics for drafting, secret selection, and in-race decisions.
 - `src/store` — the Zustand game store driving the whole game loop.

@@ -6,6 +6,7 @@ import RevealScreen from './components/RevealScreen';
 import RaceScreen from './components/RaceScreen';
 import RaceResultScreen from './components/RaceResultScreen';
 import FinalScreen from './components/FinalScreen';
+import DecisionModal from './components/DecisionModal';
 import './App.css';
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
       {phase === 'race' && <RaceScreen />}
       {phase === 'race-result' && <RaceResultScreen />}
       {phase === 'final' && <FinalScreen />}
+      <DecisionModal />
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { Button, Typography, Tag, Tooltip } from 'antd';
 import { useGameStore } from '../store/gameStore';
 import { getCharacter } from '../data/characters';
 import ActionLog from './ActionLog';
-import DecisionModal from './DecisionModal';
 import CharacterIcon from './CharacterIcon';
 
 const { Title } = Typography;
@@ -192,7 +191,6 @@ export default function RaceScreen() {
       </div>
 
       <ActionLog />
-      <DecisionModal />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { getCharacter } from '../data/characters';
 import type { AbilityContext } from '../types';
-import type { RaceRuntime } from './raceEngine';
+import { effectiveCharacter, type RaceRuntime } from './raceEngine';
 
 export interface TurnResult {
   characterId: string;
@@ -16,7 +16,7 @@ function rollDie(): number {
 function notifyAbilityResolve(runtime: RaceRuntime, ctx: AbilityContext, triggerId: string) {
   for (const racer of Object.values(runtime.racers)) {
     if (racer.characterId === triggerId || racer.finished) continue;
-    getCharacter(racer.characterId).abilities.onAbilityResolve?.(ctx, triggerId, racer.characterId);
+    effectiveCharacter(runtime, racer.characterId).abilities.onAbilityResolve?.(ctx, triggerId, racer.characterId);
   }
 }
 
@@ -47,17 +47,18 @@ export async function playTurn(
 ): Promise<TurnResult> {
   const racer = runtime.racers[characterId];
   runtime.rerollUsedThisTurn = false;
+  runtime.pendingMoveCancelled = false;
 
   ctx.log(`▶ ${ctx.describe(characterId)}'s turn (space ${racer.position}/${ctx.trackLength})`, 'turn');
 
   // 1. Passive auras fire for every racer before the active racer acts.
   for (const other of Object.values(runtime.racers)) {
     if (other.finished) continue;
-    getCharacter(other.characterId).abilities.onAnyTurnStart?.(ctx, other.characterId, characterId);
+    effectiveCharacter(runtime, other.characterId).abilities.onAnyTurnStart?.(ctx, other.characterId, characterId);
   }
 
   // 2. Active racer's own onTurnStart hook (e.g. Cheerleader's rally prompt).
-  await getCharacter(characterId).abilities.onTurnStart?.(ctx, characterId);
+  await effectiveCharacter(runtime, characterId).abilities.onTurnStart?.(ctx, characterId);
   notifyAbilityResolve(runtime, ctx, characterId);
 
   // 3. Handle tripping: skip this turn's move, stand back up, end turn immediately.
@@ -79,7 +80,7 @@ export async function playTurn(
     const modifier = racer.rollModifier;
     racer.rollModifier = 0;
     let adjusted = Math.max(0, roll + modifier);
-    const withAbility = await getCharacter(characterId).abilities.onRoll?.(ctx, characterId, adjusted);
+    const withAbility = await effectiveCharacter(runtime, characterId).abilities.onRoll?.(ctx, characterId, adjusted);
     if (withAbility !== undefined) {
       adjusted = withAbility;
       notifyAbilityResolve(runtime, ctx, characterId);
@@ -87,19 +88,38 @@ export async function playTurn(
     moveValue = adjusted;
   }
 
-  const rollDetail =
-    roll !== null && roll !== moveValue ? ` (rolled ${roll}, adjusted to ${moveValue})` : '';
-  ctx.log(`🎲 ${ctx.describe(characterId)} moves ${moveValue} space${moveValue === 1 ? '' : 's'}${rollDetail}.`, 'move');
-  await ctx.move(characterId, moveValue);
+  // 4b. Reactive hooks fired to every other racer right after the roll is known
+  // but before movement is applied (Lackey, Inchworm, Skipper).
+  for (const other of Object.values(runtime.racers)) {
+    if (other.characterId === characterId || other.finished) continue;
+    await effectiveCharacter(runtime, other.characterId).abilities.onAnyRoll?.(ctx, other.characterId, characterId, moveValue);
+  }
+
+  if (runtime.pendingMoveCancelled) {
+    ctx.log(`🚫 ${ctx.describe(characterId)}'s move is cancelled this turn!`, 'move');
+    moveValue = 0;
+  } else {
+    const rollDetail =
+      roll !== null && roll !== moveValue ? ` (rolled ${roll}, adjusted to ${moveValue})` : '';
+    ctx.log(`🎲 ${ctx.describe(characterId)} moves ${moveValue} space${moveValue === 1 ? '' : 's'}${rollDetail}.`, 'move');
+    await ctx.move(characterId, moveValue);
+  }
 
   // 5. End-of-turn hook for the active racer (e.g. M.O.U.T.H., Rocket Scientist).
-  await getCharacter(characterId).abilities.onTurnEnd?.(ctx, characterId);
+  await effectiveCharacter(runtime, characterId).abilities.onTurnEnd?.(ctx, characterId);
   notifyAbilityResolve(runtime, ctx, characterId);
+
+  // 5b. Genius: if it correctly predicted its own roll, it takes another turn.
+  if (runtime.custom[characterId]?.geniusExtraTurn) {
+    delete runtime.custom[characterId].geniusExtraTurn;
+    ctx.log(`🧠 ${ctx.describe(characterId)} predicted the roll correctly and goes again!`, 'ability');
+    ctx.requestPriorityTurn(characterId);
+  }
 
   // 6. Reactive hooks for every other still-active racer (e.g. Heckler).
   for (const other of Object.values(runtime.racers)) {
     if (other.characterId === characterId || other.finished) continue;
-    await getCharacter(other.characterId).abilities.onOtherTurnEnd?.(
+    await effectiveCharacter(runtime, other.characterId).abilities.onOtherTurnEnd?.(
       ctx,
       other.characterId,
       characterId,
@@ -114,3 +134,4 @@ export async function playTurn(
 export function isRaceOver(runtime: RaceRuntime): boolean {
   return runtime.finishedCharacterIds.length >= 2;
 }
+

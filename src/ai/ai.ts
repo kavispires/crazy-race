@@ -37,6 +37,12 @@ export function aiDecide(
   options: { label: string; value: string }[],
   runtime: RaceRuntime,
 ): string {
+  // For prompts with more than a simple yes/no (e.g. "pick a racer", "pick a space",
+  // "predict a number"), fall back to a random pick among the offered options.
+  if (options.length > 2) {
+    return options[Math.floor(Math.random() * options.length)].value;
+  }
+
   const affirmative = options.find((o) => o.value === 'yes') ?? options[0];
   const decline = options.find((o) => o.value === 'no') ?? options[options.length - 1];
 

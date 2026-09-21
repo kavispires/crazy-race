@@ -1,4 +1,4 @@
-import type { Character } from '../types';
+import type { AbilityContext, Character } from '../types';
 
 /**
  * The 12 starter roster characters. Ability logic mirrors the pseudo-code from
@@ -205,7 +205,450 @@ export const CHARACTERS: Character[] = [
       },
     },
   },
+  {
+    id: 'baba-yaga',
+    name: 'Baba Yaga',
+    description: 'Trips any racer that stops on her space, or that she stops on.',
+    tier: 2,
+    abilities: {
+      onShareSpace: (ctx, self, other) => {
+        ctx.setTripped(other, true);
+        ctx.log(`🧙‍♀️ ${ctx.describe(other)} stumbles into ${ctx.describe(self)}'s hut and trips!`);
+      },
+    },
+  },
+  {
+    id: 'blimp',
+    name: 'Blimp',
+    description: 'Before the halfway point, +3 to the main move. After, -1.',
+    tier: 2,
+    abilities: {
+      onTurnStart: (ctx, self) => {
+        const halfway = ctx.trackLength / 2;
+        const position = ctx.getRacer(self).position;
+        if (position < halfway) {
+          ctx.addRollModifier(self, 3);
+          ctx.log(`🎈 ${ctx.describe(self)} floats ahead of the halfway point: +3 to the roll!`);
+        } else {
+          ctx.addRollModifier(self, -1);
+          ctx.log(`🎈 ${ctx.describe(self)} is past the halfway point and deflates a little: -1 to the roll.`);
+        }
+      },
+    },
+  },
+  {
+    id: 'copy-cat',
+    name: 'Copy Cat',
+    description: "Has the power of whichever racer is currently in the lead (ties broken automatically).",
+    tier: 1,
+    abilities: {
+      // Delegation is handled dynamically by effectiveCharacter() in raceEngine.ts, which
+      // resolves the current position-leader's abilities for every hook call.
+    },
+  },
+  {
+    id: 'egg',
+    name: 'Egg',
+    description: 'At the start of the race, draws 3 random racers and permanently takes on one of their powers.',
+    tier: 2,
+    abilities: {
+      onRaceSetup: async (ctx, self) => {
+        const candidates = CHARACTERS.filter((c) => c.id !== 'egg' && c.id !== 'copy-cat');
+        const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+        const drawn = shuffled.slice(0, 3);
+        if (drawn.length === 0) return;
+        const choice = await ctx.decide(
+          self,
+          'Egg hatches! Pick a power to be born with:',
+          drawn.map((c) => ({ label: c.name, value: c.id })),
+        );
+        const picked = drawn.find((c) => c.id === choice) ?? drawn[0];
+        ctx.custom[self] = { ...ctx.custom[self], borrowedBaseId: picked.id };
+        ctx.log(`🥚 ${ctx.describe(self)} hatches with the power of ${picked.name}!`);
+      },
+    },
+  },
+  {
+    id: 'flip-flop',
+    name: 'Flip Flop',
+    description: 'Can skip rolling and instead swap spaces with another racer.',
+    tier: 2,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
+        if (others.length === 0) return;
+        const choice = await ctx.decide(self, 'Roll normally, or flip-flop spaces with someone?', [
+          { label: 'Roll normally', value: 'roll' },
+          { label: 'Swap spaces', value: 'swap' },
+        ]);
+        if (choice !== 'swap') return;
+        const targetId = await ctx.decide(
+          self,
+          'Swap spaces with whom?',
+          others.map((r) => ({ label: ctx.describe(r.characterId), value: r.characterId })),
+        );
+        const target = others.find((r) => r.characterId === targetId) ?? others[0];
+        const selfPos = ctx.getRacer(self).position;
+        const targetPos = target.position;
+        await ctx.setPosition(self, targetPos);
+        await ctx.setPosition(target.characterId, selfPos);
+        ctx.log(`🩴 ${ctx.describe(self)} flip-flops spaces with ${ctx.describe(target.characterId)}!`);
+        ctx.setFlatMoveOverride(self, 0);
+      },
+    },
+  },
+  {
+    id: 'genius',
+    name: 'Genius',
+    description: 'Predicts its roll before rolling; if correct, takes another turn immediately after.',
+    tier: 1,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        const guess = await ctx.decide(
+          self,
+          'Predict your roll (1-6). Guess right and take another turn!',
+          [1, 2, 3, 4, 5, 6].map((n) => ({ label: String(n), value: String(n) })),
+        );
+        ctx.custom[self] = { ...ctx.custom[self], geniusPrediction: Number(guess) };
+      },
+      onRoll: (ctx, self, roll) => {
+        const prediction = ctx.custom[self]?.geniusPrediction;
+        if (typeof prediction === 'number' && prediction === roll) {
+          ctx.custom[self] = { ...ctx.custom[self], geniusExtraTurn: true };
+          ctx.log(`🧠 ${ctx.describe(self)} predicted ${prediction} correctly! Another turn is coming.`);
+        }
+        return roll;
+      },
+    },
+  },
+  {
+    id: 'hare',
+    name: 'Hare',
+    description: '+2 to the main move. If alone in the lead at the start of a turn, skips the move for a bronze chip instead.',
+    tier: 2,
+    abilities: {
+      onTurnStart: (ctx, self) => {
+        if (isAloneInLead(ctx, self)) {
+          ctx.grantBronzeChip(self);
+          ctx.setFlatMoveOverride(self, 0);
+          ctx.log(`🐇 ${ctx.describe(self)} is alone in the lead and takes a victory lap chip instead of moving!`);
+          return;
+        }
+        ctx.addRollModifier(self, 2);
+        ctx.log(`🐇 ${ctx.describe(self)} bounds ahead: +2 to the roll!`);
+      },
+    },
+  },
+  {
+    id: 'huge-baby',
+    name: 'Huge Baby',
+    description: 'No one else may share its space (except the start). They land one space behind instead.',
+    tier: 2,
+    abilities: {
+      adjustLanding: (ctx, self, mover, proposedPosition) => {
+        if (mover === self) return undefined;
+        if (proposedPosition === 0) return undefined;
+        const babyPos = ctx.getRacer(self).position;
+        if (!ctx.getRacer(self).finished && proposedPosition === babyPos) {
+          ctx.log(`👶 ${ctx.describe(self)} won't share the space! ${ctx.describe(mover)} lands just behind instead.`);
+          return Math.max(0, babyPos - 1);
+        }
+        return undefined;
+      },
+    },
+  },
+  {
+    id: 'hypnotist',
+    name: 'Hypnotist',
+    description: 'At the start of its turn, may warp another racer to its space.',
+    tier: 2,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
+        if (others.length === 0) return;
+        const choice = await ctx.decide(self, 'Hypnotize a racer to warp them to your space?', [
+          { label: 'Yes, hypnotize', value: 'yes' },
+          { label: 'No', value: 'no' },
+        ]);
+        if (choice !== 'yes') return;
+        const targetId = await ctx.decide(
+          self,
+          'Warp whom to your space?',
+          others.map((r) => ({ label: ctx.describe(r.characterId), value: r.characterId })),
+        );
+        const target = others.find((r) => r.characterId === targetId) ?? others[0];
+        await ctx.setPosition(target.characterId, ctx.getRacer(self).position);
+        ctx.log(`🌀 ${ctx.describe(self)} hypnotizes ${ctx.describe(target.characterId)} into warping over!`);
+      },
+    },
+  },
+  {
+    id: 'inchworm',
+    name: 'Inchworm',
+    description: "Whenever another racer rolls a 1, cancels their move and inches forward 1 itself.",
+    tier: 3,
+    abilities: {
+      onAnyRoll: (ctx, self, roller, roll) => {
+        if (roller === self || roll !== 1) return;
+        ctx.cancelPendingMove();
+        void ctx.move(self, 1);
+        ctx.log(`🐛 ${ctx.describe(roller)} rolled a 1! ${ctx.describe(self)} cancels it and inches forward.`);
+      },
+    },
+  },
+  {
+    id: 'lackey',
+    name: 'Lackey',
+    description: 'Whenever another racer rolls a 6, moves 2 before they move.',
+    tier: 3,
+    abilities: {
+      onAnyRoll: async (ctx, self, roller, roll) => {
+        if (roller === self || roll !== 6) return;
+        ctx.log(`🙇 ${ctx.describe(roller)} rolled a 6! ${ctx.describe(self)} scurries ahead 2 first.`);
+        await ctx.move(self, 2);
+      },
+    },
+  },
+  {
+    id: 'legs',
+    name: 'Legs',
+    description: 'Can skip rolling for the main move and move exactly 5 instead.',
+    tier: 2,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        const choice = await ctx.decide(self, 'Roll normally, or use Legs to move exactly 5?', [
+          { label: 'Roll normally', value: 'roll' },
+          { label: 'Move 5', value: 'move5' },
+        ]);
+        if (choice !== 'move5') return;
+        ctx.setFlatMoveOverride(self, 5);
+        ctx.log(`🦵 ${ctx.describe(self)} strides forward exactly 5 spaces!`);
+      },
+    },
+  },
+  {
+    id: 'leaptoad',
+    name: 'Leaptoad',
+    description: 'While moving, hops over any space that has another racer on it.',
+    tier: 2,
+    abilities: {
+      skipOccupiedSpaces: true,
+    },
+  },
+  {
+    id: 'lovable-loser',
+    name: 'Lovable Loser',
+    description: 'At the start of its turn, gets a bronze chip if alone in last place.',
+    tier: 4,
+    abilities: {
+      onTurnStart: (ctx, self) => {
+        if (isAloneInLast(ctx, self)) {
+          ctx.grantBronzeChip(self);
+          ctx.log(`🥺 ${ctx.describe(self)} is alone in last place and earns a sympathy chip.`);
+        }
+      },
+    },
+  },
+  {
+    id: 'magician',
+    name: 'Magician',
+    description: 'Can reroll its main move up to twice per turn.',
+    tier: 2,
+    abilities: {
+      onRoll: async (ctx, self, roll) => {
+        let current = roll;
+        for (let i = 0; i < 2; i++) {
+          const choice = await ctx.decide(self, `Current roll: ${current}. Reroll it (${2 - i} left)?`, [
+            { label: 'Reroll', value: 'yes' },
+            { label: 'Keep it', value: 'no' },
+          ]);
+          if (choice !== 'yes') break;
+          current = 1 + Math.floor(Math.random() * 6);
+          ctx.log(`🎩 ${ctx.describe(self)} waves a wand and rerolls: ${current}!`);
+        }
+        return current;
+      },
+    },
+  },
+  {
+    id: 'mastermind',
+    name: 'Mastermind',
+    description: 'Before the race, predicts the winner. If correct, the race ends immediately and it finishes 2nd.',
+    tier: 1,
+    abilities: {
+      onRaceSetup: async (ctx, self) => {
+        const others = ctx.getAllRacers().filter((r) => r.characterId !== self);
+        if (others.length === 0) return;
+        const choice = await ctx.decide(
+          self,
+          'Predict the winner of this race:',
+          others.map((r) => ({ label: ctx.describe(r.characterId), value: r.characterId })),
+        );
+        ctx.custom[self] = { ...ctx.custom[self], mastermindPredictedWinner: choice };
+        ctx.log(`♟️ ${ctx.describe(self)} secretly predicts ${ctx.describe(choice)} will win!`);
+      },
+    },
+  },
+  {
+    id: 'party-animal',
+    name: 'Party Animal',
+    description: 'At the start of its turn, pulls everyone 1 space closer; gains +1 per racer that joins its space.',
+    tier: 1,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        const selfPos = ctx.getRacer(self).position;
+        const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
+        for (const other of others) {
+          if (other.position < selfPos) await ctx.move(other.characterId, 1, { silent: true });
+          else if (other.position > selfPos) await ctx.move(other.characterId, -1, { silent: true });
+        }
+        const newSelfPos = ctx.getRacer(self).position;
+        const gathered = ctx
+          .getAllRacers()
+          .filter((r) => r.characterId !== self && !r.finished && r.position === newSelfPos).length;
+        if (gathered > 0) {
+          ctx.addRollModifier(self, gathered);
+          ctx.log(`🪩 ${ctx.describe(self)} throws a party! ${gathered} racer(s) join in: +${gathered} to the roll!`);
+        } else {
+          ctx.log(`🪩 ${ctx.describe(self)} pulls everyone 1 space closer.`);
+        }
+      },
+    },
+  },
+  {
+    id: 'romantic',
+    name: 'Romantic',
+    description: 'Whenever any two other racers end up sharing a space, swoons forward 2.',
+    tier: 3,
+    abilities: {
+      onAnyShareSpace: (ctx, self) => {
+        ctx.log(`🌹 ${ctx.describe(self)} swoons at the sight of new friends and drifts forward 2!`);
+        void ctx.move(self, 2);
+      },
+    },
+  },
+  {
+    id: 'third-wheel',
+    name: 'Third Wheel',
+    description: 'Before its main move, may warp to any space occupied by exactly 2 racers.',
+    tier: 2,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
+        const counts = new Map<number, number>();
+        for (const r of others) counts.set(r.position, (counts.get(r.position) ?? 0) + 1);
+        const pairSpaces = [...counts.entries()].filter(([, count]) => count === 2).map(([pos]) => pos);
+        if (pairSpaces.length === 0) return;
+        const choice = await ctx.decide(
+          self,
+          'Warp to a cozy pair of racers?',
+          [
+            { label: 'Stay put', value: 'stay' },
+            ...pairSpaces.map((pos) => ({ label: `Space ${pos}`, value: String(pos) })),
+          ],
+        );
+        if (choice === 'stay') return;
+        await ctx.setPosition(self, Number(choice));
+        ctx.log(`🛞 ${ctx.describe(self)} warps in as the third wheel!`);
+      },
+    },
+  },
+  {
+    id: 'twin',
+    name: 'Twin',
+    description: "At the start of the race, may copy the power of a racer that won a previous race.",
+    tier: 2,
+    abilities: {
+      onRaceSetup: async (ctx, self) => {
+        const winners = [...new Set(ctx.getPreviousWinnerBaseIds())].filter((id) => id !== 'twin');
+        if (winners.length === 0) {
+          ctx.log(`👯 ${ctx.describe(self)} has no past winners to copy yet.`);
+          return;
+        }
+        const choice = await ctx.decide(
+          self,
+          'Copy the power of a previous race winner:',
+          winners.map((id) => ({ label: CHARACTER_MAP[id]?.name ?? id, value: id })),
+        );
+        ctx.custom[self] = { ...ctx.custom[self], borrowedBaseId: choice };
+        ctx.log(`👯 ${ctx.describe(self)} copies the power of ${CHARACTER_MAP[choice]?.name ?? choice}!`);
+      },
+    },
+  },
+  {
+    id: 'skipper',
+    name: 'Skipper',
+    description: 'Whenever anyone rolls a 1, jumps to the front of the turn order.',
+    tier: 2,
+    abilities: {
+      onAnyRoll: (ctx, self, roller, roll) => {
+        if (roller === self || roll !== 1) return;
+        ctx.requestPriorityTurn(self);
+        ctx.log(`⛵ ${ctx.describe(roller)} rolled a 1! ${ctx.describe(self)} sails to the front of the line.`);
+      },
+    },
+  },
+  {
+    id: 'suckerfish',
+    name: 'Suckerfish',
+    description: 'When a racer it shares a space with moves away, may follow them to their new space.',
+    tier: 2,
+    abilities: {
+      onSharedDeparture: async (ctx, self, mover) => {
+        const choice = await ctx.decide(self, `${ctx.describe(mover)} is moving away. Latch on and follow?`, [
+          { label: 'Follow', value: 'yes' },
+          { label: 'Stay', value: 'no' },
+        ]);
+        if (choice !== 'yes') return;
+        await ctx.setPosition(self, ctx.getRacer(mover).position);
+        ctx.log(`🐟 ${ctx.describe(self)} latches onto ${ctx.describe(mover)} and follows along!`);
+      },
+    },
+  },
+  {
+    id: 'sisyphus',
+    name: 'Sisyphus',
+    description: 'Starts with 4 bonus chips. Rolling a 6 sends it back to Start and costs it a chip instead of moving.',
+    tier: 2,
+    abilities: {
+      onRaceSetup: (ctx, self) => {
+        for (let i = 0; i < 4; i++) ctx.grantBronzeChip(self);
+        ctx.log(`🪨 ${ctx.describe(self)} shoulders 4 bonus chips before the race even begins.`);
+      },
+      onRoll: async (ctx, self, roll) => {
+        if (roll !== 6) return roll;
+        ctx.cancelPendingMove();
+        await ctx.setPosition(self, 0);
+        ctx.removeBronzeChip(self);
+        ctx.log(`🪨 ${ctx.describe(self)} rolls a 6, and the boulder rolls all the way back to Start! (-1 chip)`);
+        return roll;
+      },
+    },
+  },
+  {
+    id: 'stickler',
+    name: 'Stickler',
+    description: 'Other racers can only cross the finish line with an exact roll; overshooting keeps them in place.',
+    tier: 3,
+    abilities: {
+      blocksOvershoot: true,
+    },
+  },
 ];
+
+/** True if `self` has the strictly highest position among all still-active racers. */
+function isAloneInLead(ctx: AbilityContext, self: string): boolean {
+  const selfPos = ctx.getRacer(self).position;
+  const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
+  return others.every((r) => r.position < selfPos);
+}
+
+/** True if `self` has the strictly lowest position among all still-active racers. */
+function isAloneInLast(ctx: AbilityContext, self: string): boolean {
+  const selfPos = ctx.getRacer(self).position;
+  const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
+  return others.every((r) => r.position > selfPos);
+}
 
 export const CHARACTER_MAP: Record<string, Character> = Object.fromEntries(
   CHARACTERS.map((c) => [c.id, c]),

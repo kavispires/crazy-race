@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuid } from 'uuid';
-import { getCharacter, makeCharacterPool } from '../data/characters';
+import { getCharacter, makeCharacterPool, baseCharacterId } from '../data/characters';
 import { CHIP_VALUES, TRACKS } from '../data/tracks';
 import { buildContext, createInitialRacers, type RaceRuntime } from '../engine/raceEngine';
 import { isRaceOver, playTurn, useDicemongerReroll } from '../engine/turnResolver';
@@ -52,11 +52,13 @@ interface GameStore {
   racers: Record<string, RacerState>;
   turnOrder: string[]; // characterIds
   turnPointer: number;
+  priorityQueue: string[]; // characterIds that should take the very next turn (Skipper, Genius)
   starsCollected: Record<string, number>; // playerId -> star count this race
   actionLog: LogEntry[];
   pendingDecision: Decision | null;
   isProcessingTurn: boolean;
   lastRaceResult: { first: string; second: string; raceIndex: number } | null;
+  winnerBaseIdHistory: string[]; // base character ids that have won a race this game (for Twin)
 
   // internal (not for UI)
   _runtime: RaceRuntime | null;
@@ -115,11 +117,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   racers: {},
   turnOrder: [],
   turnPointer: 0,
+  priorityQueue: [],
   starsCollected: {},
   actionLog: [],
   pendingDecision: null,
   isProcessingTurn: false,
   lastRaceResult: null,
+  winnerBaseIdHistory: [],
 
   _runtime: null,
   _decisionResolver: null,
@@ -265,6 +269,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       finishedCharacterIds: [],
       eliminatedCharacterIds: [],
       rerollUsedThisTurn: false,
+      custom: {},
+      previousWinnerBaseIds: [...state.winnerBaseIdHistory],
+      pendingMoveCancelled: false,
       callbacks: {
         onLog: (entry) => set((s) => ({ actionLog: [...s.actionLog, entry] })),
         onRacersChange: (racers) => set({ racers: { ...racers } }),
@@ -275,6 +282,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
             starsCollected: { ...s.starsCollected, [ownerId]: (s.starsCollected[ownerId] ?? 0) + 1 },
           }));
         },
+        onStarRemoved: (characterId) => {
+          const ownerId = get().racers[characterId]?.ownerId;
+          if (!ownerId) return;
+          set((s) => ({
+            starsCollected: {
+              ...s.starsCollected,
+              [ownerId]: Math.max(0, (s.starsCollected[ownerId] ?? 0) - 1),
+            },
+          }));
+        },
         requestHumanDecision: (characterId, message, options) =>
           new Promise<string>((resolve) => {
             set({
@@ -283,6 +300,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             });
           }),
         delay: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        requestPriorityTurn: (characterId) =>
+          set((s) => ({ priorityQueue: [...s.priorityQueue, characterId] })),
       },
     };
 
@@ -291,6 +310,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       racers,
       turnOrder,
       turnPointer: 0,
+      priorityQueue: [],
       starsCollected: {},
       _runtime: runtime,
       actionLog: [
@@ -303,13 +323,36 @@ export const useGameStore = create<GameStore>((set, get) => ({
       ],
     });
 
-    setTimeout(() => set({ phase: 'race' }), 900);
+    // Run any pre-race setup abilities (Egg's draw, Twin's copy, Sisyphus's
+    // chips, Mastermind's prediction, ...) sequentially, then start the race.
+    (async () => {
+      const ctx = buildContext(runtime);
+      for (const cid of turnOrder) {
+        await getCharacter(cid).abilities.onRaceSetup?.(ctx, cid);
+      }
+      set({ phase: 'race' });
+    })();
   },
 
   advanceTurn: async () => {
     const state = get();
     if (state.isProcessingTurn || state.phase !== 'race' || !state._runtime) return;
     const runtime = state._runtime;
+
+    // Priority turns (Skipper, Genius) go before normal turn-order cycling.
+    if (state.priorityQueue.length > 0) {
+      const [characterId, ...restQueue] = state.priorityQueue;
+      if (runtime.racers[characterId]?.finished) {
+        set({ priorityQueue: restQueue });
+        return;
+      }
+      set({ isProcessingTurn: true, priorityQueue: restQueue });
+      const ctx = buildContext(runtime);
+      await playTurn(runtime, ctx, characterId);
+      set({ racers: { ...runtime.racers }, isProcessingTurn: false });
+      if (isRaceOver(runtime)) get().finishRace();
+      return;
+    }
 
     // Find next non-finished racer starting at turnPointer.
     let pointer = state.turnPointer;
@@ -424,6 +467,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       phase: 'race-result',
       lastRaceResult: { first: first?.characterId ?? '', second: second?.characterId ?? '', raceIndex: state.raceIndex },
       firstPlayerId: behindMost?.ownerId ?? state.firstPlayerId,
+      winnerBaseIdHistory: first
+        ? [...state.winnerBaseIdHistory, baseCharacterId(first.characterId)]
+        : state.winnerBaseIdHistory,
+      priorityQueue: [],
     });
   },
 
@@ -442,6 +489,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       racers: {},
       turnOrder: [],
       turnPointer: 0,
+      priorityQueue: [],
       starsCollected: {},
       _runtime: null,
       lastRaceResult: null,
@@ -466,11 +514,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       racers: {},
       turnOrder: [],
       turnPointer: 0,
+      priorityQueue: [],
       starsCollected: {},
       actionLog: [],
       pendingDecision: null,
       isProcessingTurn: false,
       lastRaceResult: null,
+      winnerBaseIdHistory: [],
       _runtime: null,
       _decisionResolver: null,
     });
