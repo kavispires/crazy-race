@@ -1,3 +1,4 @@
+import { Button, Popconfirm } from 'antd';
 import { useGameStore } from './store/gameStore';
 import SetupScreen from './components/SetupScreen';
 import DraftScreen from './components/DraftScreen';
@@ -11,9 +12,23 @@ import './App.css';
 
 function App() {
   const phase = useGameStore((s) => s.phase);
+  const restart = useGameStore((s) => s.restart);
 
   return (
     <div className="app-shell">
+      {phase !== 'setup' && phase !== 'final' && (
+        <Popconfirm
+          title="Reset game?"
+          description="This will end the current game and return to the home screen."
+          onConfirm={() => restart()}
+          okText="Reset"
+          cancelText="Cancel"
+        >
+          <Button danger size="small" style={{ position: 'fixed', top: 12, right: 12, zIndex: 1000 }}>
+            Reset
+          </Button>
+        </Popconfirm>
+      )}
       {phase === 'setup' && <SetupScreen />}
       {phase === 'draft' && <DraftScreen />}
       {phase === 'secret-select' && <SecretSelectScreen />}

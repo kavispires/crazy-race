@@ -1,8 +1,9 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuid } from 'uuid';
 import { getCharacter, makeCharacterPool, baseCharacterId } from '../data/characters';
 import { CHIP_VALUES, TRACKS } from '../data/tracks';
-import { buildContext, createInitialRacers, type RaceRuntime } from '../engine/raceEngine';
+import { buildContext, createInitialRacers, type RaceRuntime, type RaceRuntimeCallbacks } from '../engine/raceEngine';
 import { isRaceOver, playTurn, useDiceReroll } from '../engine/turnResolver';
 import { aiDraftPick, aiSecretSelect } from '../ai/ai';
 import type {
@@ -98,7 +99,52 @@ function makeEmptyLog(message: string): LogEntry {
   return { id: uuid(), message, timestamp: Date.now(), kind: 'system' };
 }
 
-export const useGameStore = create<GameStore>((set, get) => ({
+/**
+ * Builds the live (non-serializable) callback set for a RaceRuntime. Extracted so it can be
+ * rebuilt both when a race first begins and when a persisted game is rehydrated from
+ * localStorage on page load (functions can't survive JSON serialization).
+ */
+function createRuntimeCallbacks(
+  set: (partial: Partial<GameStore> | ((s: GameStore) => Partial<GameStore>)) => void,
+  get: () => GameStore,
+): RaceRuntimeCallbacks {
+  return {
+    onLog: (entry) => set((s) => ({ actionLog: [...s.actionLog, entry] })),
+    onRacersChange: (racers) => set({ racers: { ...racers } }),
+    onStarCollected: (characterId) => {
+      const ownerId = get().racers[characterId]?.ownerId;
+      if (!ownerId) return;
+      set((s) => ({
+        starsCollected: { ...s.starsCollected, [ownerId]: (s.starsCollected[ownerId] ?? 0) + 1 },
+      }));
+    },
+    onStarRemoved: (characterId) => {
+      const ownerId = get().racers[characterId]?.ownerId;
+      if (!ownerId) return;
+      set((s) => ({
+        starsCollected: {
+          ...s.starsCollected,
+          [ownerId]: Math.max(0, (s.starsCollected[ownerId] ?? 0) - 1),
+        },
+      }));
+    },
+    requestHumanDecision: (characterId, message, options) =>
+      new Promise<string>((resolve) => {
+        const ownerId = get().racers[characterId]?.ownerId ?? '';
+        set({
+          pendingDecision: { id: uuid(), characterId, ownerId, message, options },
+          _decisionResolver: resolve,
+        });
+      }),
+    delay: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    requestPriorityTurn: (characterId) =>
+      set((s) => ({ priorityQueue: [...s.priorityQueue, characterId] })),
+  };
+}
+
+export const useGameStore = create<GameStore>()(
+  persist(
+    (set, get) => ({
   phase: 'setup',
   players: [],
   playerOrder: [],
@@ -272,37 +318,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       custom: {},
       previousWinnerBaseIds: [...state.winnerBaseIdHistory],
       pendingMoveCancelled: false,
-      callbacks: {
-        onLog: (entry) => set((s) => ({ actionLog: [...s.actionLog, entry] })),
-        onRacersChange: (racers) => set({ racers: { ...racers } }),
-        onStarCollected: (characterId) => {
-          const ownerId = get().racers[characterId]?.ownerId;
-          if (!ownerId) return;
-          set((s) => ({
-            starsCollected: { ...s.starsCollected, [ownerId]: (s.starsCollected[ownerId] ?? 0) + 1 },
-          }));
-        },
-        onStarRemoved: (characterId) => {
-          const ownerId = get().racers[characterId]?.ownerId;
-          if (!ownerId) return;
-          set((s) => ({
-            starsCollected: {
-              ...s.starsCollected,
-              [ownerId]: Math.max(0, (s.starsCollected[ownerId] ?? 0) - 1),
-            },
-          }));
-        },
-        requestHumanDecision: (characterId, message, options) =>
-          new Promise<string>((resolve) => {
-            set({
-              pendingDecision: { id: uuid(), characterId, ownerId: owners[characterId], message, options },
-              _decisionResolver: resolve,
-            });
-          }),
-        delay: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-        requestPriorityTurn: (characterId) =>
-          set((s) => ({ priorityQueue: [...s.priorityQueue, characterId] })),
-      },
+      callbacks: createRuntimeCallbacks(set, get),
     };
 
     set({
@@ -525,4 +541,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
       _decisionResolver: null,
     });
   },
-}));
+    }),
+    {
+      name: 'magical-athlete-save',
+      storage: createJSONStorage(() => localStorage),
+      // `_decisionResolver` is a live function and can't survive JSON serialization; it's
+      // dropped automatically by JSON.stringify, but we null it explicitly for clarity/typing.
+      partialize: (state) => ({ ...state, _decisionResolver: null }),
+      // On rehydration, `_runtime.callbacks` (functions) and `_decisionResolver` are lost, and
+      // any in-flight turn/decision can't be resumed safely. Rebuild fresh callbacks bound to
+      // the live store, and clear transient async flags so the player can simply continue.
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        useGameStore.setState({
+          isProcessingTurn: false,
+          pendingDecision: null,
+          _decisionResolver: null,
+          _runtime: state._runtime
+            ? { ...state._runtime, callbacks: createRuntimeCallbacks(useGameStore.setState, useGameStore.getState) }
+            : null,
+        });
+      },
+    },
+  ),
+);
