@@ -17,7 +17,7 @@ export default function CharacterIcon({
   const name = getCharacter(characterId).name;
   return (
     <img
-      src={`/racers/${baseId}.svg`}
+      src={`${import.meta.env.BASE_URL}racers/${baseId}.svg`}
       alt={name}
       title={name}
       width={size}
