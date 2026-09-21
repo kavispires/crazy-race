@@ -47,8 +47,8 @@ function buildWildTrack(id: string, name: string, length: number, seed: number, 
 }
 
 export const TRACKS: Track[] = [
-  buildMildTrack('track-1', 'Mild Mile I', 40, 0),
-  buildWildTrack('track-2', 'Wild Wilds I', 45, 1, [
+  buildMildTrack('track-1', 'Mild Mile I', 30, 0),
+  buildWildTrack('track-2', 'Wild Wilds I', 30, 1, [
     { type: 'star' },
     { type: 'rock' },
     { type: 'arrow', delta: 3 },
@@ -60,8 +60,8 @@ export const TRACKS: Track[] = [
     { type: 'arrow', delta: 2 },
     { type: 'star' },
   ]),
-  buildMildTrack('track-3', 'Mild Mile II', 50, 2),
-  buildWildTrack('track-4', 'Wild Wilds II', 55, 3, [
+  buildMildTrack('track-3', 'Mild Mile II', 30, 2),
+  buildWildTrack('track-4', 'Wild Wilds II', 30, 3, [
     { type: 'star' },
     { type: 'rock' },
     { type: 'arrow', delta: 4 },
