@@ -1,6 +1,6 @@
 import { getCharacter } from '../data/characters';
 import type { AbilityContext } from '../types';
-import { effectiveCharacter, type RaceRuntime } from './raceEngine';
+import { effectiveCharacter, isImmune, type RaceRuntime } from './raceEngine';
 
 export interface TurnResult {
   characterId: string;
@@ -51,10 +51,13 @@ export async function playTurn(
 
   ctx.log(`▶ ${ctx.describe(characterId)}'s turn (space ${racer.position}/${ctx.trackLength})`, 'turn');
 
-  // 1. Passive auras fire for every racer before the active racer acts.
-  for (const other of Object.values(runtime.racers)) {
-    if (other.finished) continue;
-    effectiveCharacter(runtime, other.characterId).abilities.onAnyTurnStart?.(ctx, other.characterId, characterId);
+  // 1. Passive auras fire for every racer before the active racer acts (skipped entirely if the
+  // active racer is immune, e.g. Honey Badger, since it can't be affected by others' abilities).
+  if (!isImmune(runtime, characterId)) {
+    for (const other of Object.values(runtime.racers)) {
+      if (other.finished) continue;
+      effectiveCharacter(runtime, other.characterId).abilities.onAnyTurnStart?.(ctx, other.characterId, characterId);
+    }
   }
 
   // 2. Active racer's own onTurnStart hook (e.g. Cheerleader's rally prompt).
@@ -76,6 +79,13 @@ export async function playTurn(
     moveValue = racer.flatMoveOverride;
     racer.flatMoveOverride = null;
   } else {
+    // Oracle et al. get one last chance to predict the roll before it happens.
+    if (!isImmune(runtime, characterId)) {
+      for (const other of Object.values(runtime.racers)) {
+        if (other.characterId === characterId || other.finished) continue;
+        await effectiveCharacter(runtime, other.characterId).abilities.onBeforeAnyRoll?.(ctx, other.characterId, characterId);
+      }
+    }
     roll = rollDie();
     const modifier = racer.rollModifier;
     racer.rollModifier = 0;
@@ -89,10 +99,13 @@ export async function playTurn(
   }
 
   // 4b. Reactive hooks fired to every other racer right after the roll is known
-  // but before movement is applied (Lackey, Inchworm, Skipper).
-  for (const other of Object.values(runtime.racers)) {
-    if (other.characterId === characterId || other.finished) continue;
-    await effectiveCharacter(runtime, other.characterId).abilities.onAnyRoll?.(ctx, other.characterId, characterId, moveValue);
+  // but before movement is applied (Lackey, Inchworm, Skipper, Cecaelia). Skipped
+  // entirely if the roller is immune (Honey Badger can't be cancelled/targeted).
+  if (!isImmune(runtime, characterId)) {
+    for (const other of Object.values(runtime.racers)) {
+      if (other.characterId === characterId || other.finished) continue;
+      await effectiveCharacter(runtime, other.characterId).abilities.onAnyRoll?.(ctx, other.characterId, characterId, moveValue);
+    }
   }
 
   if (runtime.pendingMoveCancelled) {
@@ -116,15 +129,18 @@ export async function playTurn(
     ctx.requestPriorityTurn(characterId);
   }
 
-  // 6. Reactive hooks for every other still-active racer (e.g. Heckler).
-  for (const other of Object.values(runtime.racers)) {
-    if (other.characterId === characterId || other.finished) continue;
-    await effectiveCharacter(runtime, other.characterId).abilities.onOtherTurnEnd?.(
-      ctx,
-      other.characterId,
-      characterId,
-      moveValue,
-    );
+  // 6. Reactive hooks for every other still-active racer (e.g. Heckler, Allosaurus).
+  // Skipped if the just-finished turn belongs to an immune racer (Honey Badger).
+  if (!isImmune(runtime, characterId)) {
+    for (const other of Object.values(runtime.racers)) {
+      if (other.characterId === characterId || other.finished) continue;
+      await effectiveCharacter(runtime, other.characterId).abilities.onOtherTurnEnd?.(
+        ctx,
+        other.characterId,
+        characterId,
+        moveValue,
+      );
+    }
   }
 
   return { characterId, roll, spacesMoved: moveValue, tripped: false };

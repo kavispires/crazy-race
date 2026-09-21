@@ -89,6 +89,11 @@ export function effectiveCharacter(runtime: RaceRuntime, characterId: string): C
   return own;
 }
 
+/** True if this racer (e.g. Honey Badger) is completely unaffected by other characters' abilities. */
+export function isImmune(runtime: RaceRuntime, characterId: string): boolean {
+  return effectiveCharacter(runtime, characterId).abilities.immune === true;
+}
+
 /** Builds the AbilityContext bound to a specific runtime, wiring up chain-reaction notifications. */
 export function buildContext(runtime: RaceRuntime): AbilityContext {
   const describe = (characterId: string) => {
@@ -122,21 +127,42 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
     }
   };
 
-  const move = async (characterId: string, delta: number, opts?: { silent?: boolean }) => {
+  const checkGreekPrediction = () => {
+    const active = Object.values(runtime.racers).filter((r) => !r.finished);
+    if (active.length === 0) return;
+    const last = active.reduce((a, b) => (a.position <= b.position ? a : b));
+    for (const [greekId, data] of Object.entries(runtime.custom)) {
+      if (data?.greekPredictedLast !== last.characterId) continue;
+      runtime.callbacks.onStarCollected(greekId);
+      runtime.callbacks.onStarCollected(greekId);
+      runtime.callbacks.onStarCollected(greekId);
+      log(`🏺 ${describe(greekId)} correctly predicted ${describe(last.characterId)} would finish last and earns 3 bonus chips!`, 'ability');
+    }
+  };
+
+  const move = async (characterId: string, delta: number, opts?: { silent?: boolean; depth?: number }) => {
     const racer = runtime.racers[characterId];
     if (!racer || racer.finished) return;
+    const depth = opts?.depth ?? 0;
+    // Safety valve: an arrow hazard and a landing-redirect ability (e.g. Huge Baby) can bounce a
+    // racer back and forth forever (arrow pushes onto the redirect target, which pushes right back
+    // onto the arrow). If we recurse too deep, stop chaining and just settle in place.
+    if (depth > 25) {
+      log(`⚠️ ${describe(characterId)} gets stuck bouncing between hazards and stays put!`, 'hazard');
+      return;
+    }
     const from = racer.position;
 
     // Racers sharing the mover's space before it departs (for Suckerfish).
     const stationaryAtFrom = Object.values(runtime.racers).filter(
-      (r) => r.characterId !== characterId && !r.finished && r.position === from,
+      (r) => r.characterId !== characterId && !r.finished && r.position === from && !isImmune(runtime, r.characterId),
     );
 
     let to = from + delta;
     if (to < 0) to = 0;
 
-    // Stickler: other racers can't overshoot the finish line, only land exactly.
-    if (to > runtime.track.length) {
+    // Stickler: other racers can't overshoot the finish line, only land exactly (immune racers ignore this).
+    if (to > runtime.track.length && !isImmune(runtime, characterId)) {
       const sticklerBlocking = Object.values(runtime.racers).some(
         (r) => r.characterId !== characterId && !r.finished && effectiveCharacter(runtime, r.characterId).abilities.blocksOvershoot,
       );
@@ -169,8 +195,8 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       to = pos;
     }
 
-    // Huge Baby: redirect anyone who'd land on its space (except the start line).
-    if (to !== 0) {
+    // Huge Baby / Argus: let others redirect where the mover would land (immune racers ignore this).
+    if (to !== 0 && !isImmune(runtime, characterId)) {
       for (const other of Object.values(runtime.racers)) {
         if (other.characterId === characterId || other.finished) continue;
         const adjusted = await effectiveCharacter(runtime, other.characterId).abilities.adjustLanding?.(
@@ -194,6 +220,8 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
 
     if (!opts?.silent) {
       for (const otherId of passedCharacterIds) {
+        // Honey Badger-style immunity: neither side of a pass interaction fires if either racer is immune.
+        if (isImmune(runtime, characterId) || isImmune(runtime, otherId)) continue;
         const selfAbilities = effectiveCharacter(runtime, characterId).abilities;
         const otherAbilities = effectiveCharacter(runtime, otherId).abilities;
         await selfAbilities.onPass?.(ctx, characterId, otherId);
@@ -203,14 +231,16 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       }
 
       // Suckerfish: racers left behind at the old space may follow to the new one.
-      for (const stayer of stationaryAtFrom) {
-        if (stayer.finished || stayer.position !== from) continue;
-        await effectiveCharacter(runtime, stayer.characterId).abilities.onSharedDeparture?.(
-          ctx,
-          stayer.characterId,
-          characterId,
-        );
-        notifyAbilityResolve(stayer.characterId);
+      if (!isImmune(runtime, characterId)) {
+        for (const stayer of stationaryAtFrom) {
+          if (stayer.finished || stayer.position !== from) continue;
+          await effectiveCharacter(runtime, stayer.characterId).abilities.onSharedDeparture?.(
+            ctx,
+            stayer.characterId,
+            characterId,
+          );
+          notifyAbilityResolve(stayer.characterId);
+        }
       }
     }
 
@@ -223,6 +253,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       log(`🏁 ${describe(characterId)} crosses the finish line in ${place} place!`, 'finish');
       runtime.callbacks.onRacersChange({ ...runtime.racers });
       if (racer.finishOrder === 0) checkMastermindPrediction(characterId);
+      if (runtime.finishedCharacterIds.length === 2) checkGreekPrediction();
       return;
     }
 
@@ -238,15 +269,15 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       } else if (space.effect.type === 'arrow') {
         const direction = space.effect.delta > 0 ? 'forward' : 'backward';
         log(`↔️ ${describe(characterId)} is caught by an arrow and pushed ${direction}!`, 'hazard');
-        await move(characterId, space.effect.delta, { silent: opts?.silent });
+        await move(characterId, space.effect.delta, { silent: opts?.silent, depth: depth + 1 });
         return;
       }
     }
 
     // Shared-space resolution (fires for both racers involved, plus third parties).
-    if (!opts?.silent) {
+    if (!opts?.silent && !isImmune(runtime, characterId)) {
       const sharing = Object.values(runtime.racers).filter(
-        (r) => r.characterId !== characterId && !r.finished && r.position === racer.position,
+        (r) => r.characterId !== characterId && !r.finished && r.position === racer.position && !isImmune(runtime, r.characterId),
       );
       for (const other of sharing) {
         const selfAbilities = effectiveCharacter(runtime, characterId).abilities;

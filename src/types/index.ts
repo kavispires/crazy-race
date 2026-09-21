@@ -121,6 +121,8 @@ export interface CharacterAbilities {
   onRoll?: (ctx: AbilityContext, self: string, roll: number) => Promise<number> | number;
   /** Fired to every other still-active racer right after `roller`'s roll is finalized, before movement. */
   onAnyRoll?: (ctx: AbilityContext, self: string, roller: string, roll: number) => Promise<void> | void;
+  /** Fired to every other still-active racer right before `roller` rolls the die for their main move (not fired for flat-move overrides). */
+  onBeforeAnyRoll?: (ctx: AbilityContext, self: string, roller: string) => Promise<void> | void;
   /** Fired whenever `self` passes another racer during a move. */
   onPass?: (ctx: AbilityContext, self: string, other: string) => Promise<void> | void;
   /** Fired whenever `self` is passed by another racer during a move. */
@@ -142,6 +144,8 @@ export interface CharacterAbilities {
   skipOccupiedSpaces?: boolean;
   /** If true, while this racer is active and unfinished, other racers cannot overshoot the finish line (exact landing required). */
   blocksOvershoot?: boolean;
+  /** If true, this racer is completely unaffected by every other character's ability, and is never considered to be sharing a space with anyone. */
+  immune?: boolean;
   /** Fired at the end of self's own turn. */
   onTurnEnd?: (ctx: AbilityContext, self: string) => Promise<void> | void;
   /** Fired whenever *any* character's ability resolves (including other characters). */

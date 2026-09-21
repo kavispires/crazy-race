@@ -168,7 +168,7 @@ export const CHARACTERS: Character[] = [
         const mouth = ctx.getRacer(self);
         const sharing = ctx
           .getAllRacers()
-          .filter((r) => r.characterId !== self && !r.finished && r.position === mouth.position);
+          .filter((r) => r.characterId !== self && !r.finished && r.position === mouth.position && !isImmuneRacer(r.characterId));
         if (sharing.length === 1) {
           ctx.log(`👄 ${ctx.describe(self)} devours ${ctx.describe(sharing[0].characterId)}!`);
           ctx.eliminate(sharing[0].characterId);
@@ -634,6 +634,259 @@ export const CHARACTERS: Character[] = [
       blocksOvershoot: true,
     },
   },
+  {
+    id: 'apparition',
+    name: 'Apparition',
+    description: 'At the start of its turn, moves 1 space for every racer currently ahead of it.',
+    tier: 2,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        const selfPos = ctx.getRacer(self).position;
+        const ahead = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished && r.position > selfPos).length;
+        if (ahead > 0) {
+          ctx.log(`👻 ${ctx.describe(self)} drifts forward ${ahead} space${ahead === 1 ? '' : 's'}, one for each racer ahead!`);
+          await ctx.move(self, ahead);
+        }
+      },
+    },
+  },
+  {
+    id: 'argus',
+    name: 'Argus',
+    description:
+      "Racers can't pass its space unless they started their move there (they stop on it instead); trips if 2+ racers start a turn on its space.",
+    tier: 2,
+    abilities: {
+      onTurnStart: (ctx, self) => {
+        const argusPos = ctx.getRacer(self).position;
+        const occupants = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished && r.position === argusPos);
+        if (occupants.length >= 2) {
+          ctx.setTripped(self, true);
+          ctx.log(`👁️ ${ctx.describe(self)} is surrounded by a crowd and trips!`);
+        }
+      },
+      adjustLanding: (ctx, self, mover, proposedPosition) => {
+        if (mover === self) return undefined;
+        const argusPos = ctx.getRacer(self).position;
+        const movingFrom = ctx.getRacer(mover).position;
+        if (movingFrom === argusPos) return undefined; // started here, free to pass through
+        const crossesForward = movingFrom < argusPos && argusPos < proposedPosition;
+        const crossesBackward = movingFrom > argusPos && argusPos > proposedPosition;
+        if (crossesForward || crossesBackward) {
+          ctx.log(`👁️ ${ctx.describe(self)}'s watchful eye stops ${ctx.describe(mover)} in their tracks!`);
+          return argusPos;
+        }
+        return undefined;
+      },
+    },
+  },
+  {
+    id: 'banshee',
+    name: 'Banshee',
+    description: 'At the start of its turn, may warp any racer to the space directly behind it.',
+    tier: 2,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
+        if (others.length === 0) return;
+        const choice = await ctx.decide(self, 'Warp a racer to the space behind you?', [
+          { label: 'Yes, warp someone', value: 'yes' },
+          { label: 'No', value: 'no' },
+        ]);
+        if (choice !== 'yes') return;
+        const targetId = await ctx.decide(
+          self,
+          'Warp whom behind you?',
+          others.map((r) => ({ label: ctx.describe(r.characterId), value: r.characterId })),
+        );
+        const target = others.find((r) => r.characterId === targetId) ?? others[0];
+        const behind = Math.max(0, ctx.getRacer(self).position - 1);
+        await ctx.setPosition(target.characterId, behind);
+        ctx.log(`😱 ${ctx.describe(self)} lets out a wail and warps ${ctx.describe(target.characterId)} behind her!`);
+      },
+    },
+  },
+  {
+    id: 'allosaurus',
+    name: 'Allosaurus',
+    description: 'Whenever another racer moves exactly 4 spaces on their turn, also moves 4.',
+    tier: 3,
+    abilities: {
+      onOtherTurnEnd: async (ctx, self, other, spacesMoved) => {
+        if (spacesMoved !== 4) return;
+        ctx.log(`🦖 ${ctx.describe(other)} moved 4 spaces! ${ctx.describe(self)} stomps forward 4 too!`);
+        await ctx.move(self, 4);
+      },
+    },
+  },
+  {
+    id: 'cecaelia',
+    name: 'Cecaelia',
+    description: 'Whenever anyone rolls a 3 for their main move, moves 4. Whenever anyone rolls a 5, moves -4.',
+    tier: 2,
+    abilities: {
+      onAnyRoll: async (ctx, self, roller, roll) => {
+        if (roller === self) return;
+        if (roll === 3) {
+          ctx.log(`🐙 ${ctx.describe(roller)} rolled a 3! ${ctx.describe(self)} lashes forward 4 tentacles' worth.`);
+          await ctx.move(self, 4);
+        } else if (roll === 5) {
+          ctx.log(`🐙 ${ctx.describe(roller)} rolled a 5! ${ctx.describe(self)} gets yanked back 4.`);
+          await ctx.move(self, -4);
+        }
+      },
+    },
+  },
+  {
+    id: 'snowman',
+    name: 'Snowman',
+    description: 'Starts with 8 bonus chips, but must discard 1 at the start of every turn. Keeps whatever is left.',
+    tier: 3,
+    abilities: {
+      onRaceSetup: (ctx, self) => {
+        for (let i = 0; i < 8; i++) ctx.grantBronzeChip(self);
+        ctx.log(`⛄ ${ctx.describe(self)} rolls into the race carrying 8 chips of packed snow.`);
+      },
+      onTurnStart: (ctx, self) => {
+        ctx.removeBronzeChip(self);
+        ctx.log(`⛄ ${ctx.describe(self)} melts a little and drops 1 chip.`);
+      },
+    },
+  },
+  {
+    id: 'greek',
+    name: 'Greek',
+    description: 'Before the race, predicts who will finish last. If correct, earns 3 bonus chips.',
+    tier: 2,
+    abilities: {
+      onRaceSetup: async (ctx, self) => {
+        const others = ctx.getAllRacers().filter((r) => r.characterId !== self);
+        if (others.length === 0) return;
+        const choice = await ctx.decide(
+          self,
+          'Predict who will finish LAST in this race:',
+          others.map((r) => ({ label: ctx.describe(r.characterId), value: r.characterId })),
+        );
+        ctx.custom[self] = { ...ctx.custom[self], greekPredictedLast: choice };
+        ctx.log(`🏺 ${ctx.describe(self)} secretly predicts ${ctx.describe(choice)} will finish last!`);
+      },
+    },
+  },
+  {
+    id: 'honey-badger',
+    name: 'Honey Badger',
+    description: "Completely unaffected by every other racer's ability, and never considered to be sharing a space.",
+    tier: 1,
+    abilities: {
+      immune: true,
+    },
+  },
+  {
+    id: 'oracle',
+    name: 'Oracle',
+    description: 'Before any roll (its own or another racer\'s), predicts the result. Correct guesses move it 1.',
+    tier: 2,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        const guess = await ctx.decide(
+          self,
+          'Predict your own upcoming roll (1-6):',
+          [1, 2, 3, 4, 5, 6].map((n) => ({ label: String(n), value: String(n) })),
+        );
+        ctx.custom[self] = { ...ctx.custom[self], oracleSelfPrediction: Number(guess) };
+      },
+      onRoll: (ctx, self, roll) => {
+        const prediction = ctx.custom[self]?.oracleSelfPrediction;
+        if (typeof prediction === 'number' && prediction === roll) {
+          ctx.log(`🔮 ${ctx.describe(self)} foresaw the roll! Drifts forward 1.`);
+          void ctx.move(self, 1);
+        }
+        return roll;
+      },
+      onBeforeAnyRoll: async (ctx, self, roller) => {
+        const guess = await ctx.decide(
+          self,
+          `Predict ${ctx.describe(roller)}'s upcoming roll (1-6):`,
+          [1, 2, 3, 4, 5, 6].map((n) => ({ label: String(n), value: String(n) })),
+        );
+        ctx.custom[self] = { ...ctx.custom[self], oracleOtherPrediction: Number(guess) };
+      },
+      onAnyRoll: (ctx, self, roller, roll) => {
+        if (roller === self) return;
+        const prediction = ctx.custom[self]?.oracleOtherPrediction;
+        if (typeof prediction === 'number' && prediction === roll) {
+          ctx.log(`🔮 ${ctx.describe(self)} correctly predicted ${ctx.describe(roller)}'s roll! Drifts forward 1.`);
+          void ctx.move(self, 1);
+        }
+      },
+    },
+  },
+  {
+    id: 'queen',
+    name: 'Queen',
+    description: 'Can skip rolling and move exactly 6 instead. Whenever anyone rolls a 6, moves -4.',
+    tier: 1,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        const choice = await ctx.decide(self, 'Roll normally, or command a royal move of 6?', [
+          { label: 'Roll normally', value: 'roll' },
+          { label: 'Move 6', value: 'move6' },
+        ]);
+        if (choice !== 'move6') return;
+        ctx.setFlatMoveOverride(self, 6);
+        ctx.log(`👑 ${ctx.describe(self)} commands a royal advance of exactly 6!`);
+      },
+      onAnyRoll: async (ctx, self, roller, roll) => {
+        if (roller === self || roll !== 6) return;
+        ctx.log(`👑 ${ctx.describe(roller)} rolled a 6! ${ctx.describe(self)} recoils back 4.`);
+        await ctx.move(self, -4);
+      },
+    },
+  },
+  {
+    id: 'rhinoceros',
+    name: 'Rhinoceros',
+    description: 'If it rolls a 1, keeps rolling and adding to the total until something other than a 1 comes up.',
+    tier: 2,
+    abilities: {
+      onRoll: async (ctx, self, roll) => {
+        let total = roll;
+        while (total === 1) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          const extra = 1 + Math.floor(Math.random() * 6);
+          ctx.log(`🦏 ${ctx.describe(self)} rolled a 1 and charges on: +${extra}!`);
+          total += extra;
+        }
+        return total;
+      },
+    },
+  },
+  {
+    id: 'nyx',
+    name: 'Nyx',
+    description: 'If it passes every other active racer in a single move, instantly warps to the finish line.',
+    tier: 1,
+    abilities: {
+      onTurnStart: (ctx, self) => {
+        ctx.custom[self] = { ...ctx.custom[self], nyxPassedThisTurn: [] };
+      },
+      onPass: (ctx, self, other) => {
+        const data = ctx.custom[self] ?? {};
+        const passed = Array.isArray(data.nyxPassedThisTurn) ? (data.nyxPassedThisTurn as string[]) : [];
+        ctx.custom[self] = { ...data, nyxPassedThisTurn: [...passed, other] };
+      },
+      onTurnEnd: async (ctx, self) => {
+        const data = ctx.custom[self];
+        const passed = Array.isArray(data?.nyxPassedThisTurn) ? (data!.nyxPassedThisTurn as string[]) : [];
+        const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
+        if (others.length > 0 && new Set(passed).size >= others.length) {
+          ctx.log(`🌙 ${ctx.describe(self)} slips past everyone in the dark and warps straight to the finish!`);
+          const selfPos = ctx.getRacer(self).position;
+          await ctx.move(self, ctx.trackLength - selfPos);
+        }
+      },
+    },
+  },
 ];
 
 /** True if `self` has the strictly highest position among all still-active racers. */
@@ -648,6 +901,11 @@ function isAloneInLast(ctx: AbilityContext, self: string): boolean {
   const selfPos = ctx.getRacer(self).position;
   const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
   return others.every((r) => r.position > selfPos);
+}
+
+/** True if this racer's base character is immune to other characters' abilities (e.g. Honey Badger). */
+function isImmuneRacer(characterId: string): boolean {
+  return CHARACTER_MAP[baseCharacterId(characterId)]?.abilities.immune === true;
 }
 
 export const CHARACTER_MAP: Record<string, Character> = Object.fromEntries(
