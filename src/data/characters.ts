@@ -887,6 +887,169 @@ export const CHARACTERS: Character[] = [
       },
     },
   },
+  {
+    id: 'android',
+    name: 'Android',
+    description: 'Never rolls; moves 1 space on its first turn, 2 on its second, up to a max of 5.',
+    tier: 2,
+    abilities: {
+      onTurnStart: (ctx, self) => {
+        const prev = Number(ctx.custom[self]?.androidTurnCount ?? 0);
+        const next = Math.min(prev + 1, 5);
+        ctx.custom[self] = { ...ctx.custom[self], androidTurnCount: next };
+        ctx.setFlatMoveOverride(self, next);
+      },
+    },
+  },
+  {
+    id: 'cheetah',
+    name: 'Cheetah',
+    description: 'Can skip rolling to sprint 8 spaces, but must move back 1 and skip its next roll after.',
+    tier: 2,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        if (ctx.custom[self]?.cheetahFatigued) {
+          ctx.custom[self] = { ...ctx.custom[self], cheetahFatigued: false };
+          ctx.setFlatMoveOverride(self, -1);
+          ctx.log(`🐆 ${ctx.describe(self)} is worn out from sprinting and stumbles back 1 space.`);
+          return;
+        }
+        const choice = await ctx.decide(self, 'Roll normally, or sprint 8 spaces?', [
+          { label: 'Roll normally', value: 'roll' },
+          { label: 'Sprint 8!', value: 'sprint' },
+        ]);
+        if (choice !== 'sprint') return;
+        ctx.setFlatMoveOverride(self, 8);
+        ctx.custom[self] = { ...ctx.custom[self], cheetahFatigued: true };
+        ctx.log(`🐆 ${ctx.describe(self)} sprints ahead 8 spaces!`);
+      },
+    },
+  },
+  {
+    id: 'spring',
+    name: 'Spring',
+    description: 'Whenever it stops exactly 1 space behind another racer, warps to the space in front of them.',
+    tier: 2,
+    abilities: {
+      onTurnEnd: async (ctx, self) => {
+        let iterations = 0;
+        while (iterations < 30) {
+          if (ctx.getRacer(self).finished) break;
+          const selfPos = ctx.getRacer(self).position;
+          const ahead = ctx
+            .getAllRacers()
+            .find((r) => r.characterId !== self && !r.finished && !isImmuneRacer(r.characterId) && r.position === selfPos + 1);
+          if (!ahead) break;
+          await ctx.setPosition(self, ahead.position + 1);
+          ctx.log(`🌀 ${ctx.describe(self)} springs past ${ctx.describe(ahead.characterId)} to land just ahead!`);
+          iterations++;
+        }
+      },
+    },
+  },
+  {
+    id: 'kraken',
+    name: 'Kraken',
+    description: 'Whenever another racer ends their turn exactly 5 or 6 spaces ahead of it, drags them back and moves 2.',
+    tier: 3,
+    abilities: {
+      onOtherTurnEnd: async (ctx, self, other) => {
+        const otherRacer = ctx.getRacer(other);
+        if (otherRacer.finished) return;
+        const selfPos = ctx.getRacer(self).position;
+        const distance = otherRacer.position - selfPos;
+        if (distance !== 5 && distance !== 6) return;
+        await ctx.setPosition(other, selfPos);
+        ctx.log(`🦑 ${ctx.describe(self)} drags ${ctx.describe(other)} back with a tentacle!`);
+        await ctx.move(self, 2);
+      },
+    },
+  },
+  {
+    id: 'poltergeist',
+    name: 'Poltergeist',
+    description: 'Once per race, may warp every other racer to 1st place, then moves 3 (instead of rolling).',
+    tier: 1,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        if (ctx.custom[self]?.poltergeistUsed) return;
+        const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
+        if (others.length === 0) return;
+        const choice = await ctx.decide(self, 'Roll normally, or trigger chaos?', [
+          { label: 'Roll normally', value: 'roll' },
+          { label: 'Trigger chaos!', value: 'chaos' },
+        ]);
+        if (choice !== 'chaos') return;
+        ctx.custom[self] = { ...ctx.custom[self], poltergeistUsed: true };
+        const leadPosition = Math.max(...others.map((r) => r.position));
+        for (const other of others) {
+          if (isImmuneRacer(other.characterId) || other.position === leadPosition) continue;
+          await ctx.setPosition(other.characterId, leadPosition);
+        }
+        ctx.log(`🌪️ ${ctx.describe(self)} unleashes chaos, warping everyone up to 1st place!`);
+        ctx.setFlatMoveOverride(self, 3);
+      },
+    },
+  },
+  {
+    id: 'snail',
+    name: 'Snail',
+    description: 'Never rolls; always moves 1. Whenever anyone else rolls a 1, moves 3 instead.',
+    tier: 3,
+    abilities: {
+      onTurnStart: (ctx, self) => {
+        ctx.setFlatMoveOverride(self, 1);
+      },
+      onAnyRoll: (ctx, self, roller, roll) => {
+        if (roll !== 1) return;
+        void ctx.move(self, 3);
+        ctx.log(`🐌 ${ctx.describe(roller)} rolled a 1! ${ctx.describe(self)} zooms forward 3.`);
+      },
+    },
+  },
+  {
+    id: 'scientist',
+    name: 'Scientist',
+    description: 'At the start of its turn, may permanently swap abilities with a racer sharing its space.',
+    tier: 2,
+    abilities: {
+      onTurnStart: async (ctx, self) => {
+        const selfPos = ctx.getRacer(self).position;
+        const sharing = ctx
+          .getAllRacers()
+          .filter(
+            (r) =>
+              r.characterId !== self &&
+              !r.finished &&
+              r.position === selfPos &&
+              !isImmuneRacer(r.characterId) &&
+              baseCharacterId(r.characterId) !== 'copy-cat',
+          );
+        if (sharing.length === 0) return;
+        let targetId: string;
+        if (sharing.length === 1) {
+          targetId = sharing[0].characterId;
+        } else {
+          targetId = await ctx.decide(
+            self,
+            'Swap abilities with whom?',
+            sharing.map((r) => ({ label: ctx.describe(r.characterId), value: r.characterId })),
+          );
+        }
+        const targetName = ctx.describe(targetId);
+        const choice = await ctx.decide(self, `Permanently swap abilities with ${targetName}?`, [
+          { label: 'Yes, swap!', value: 'yes' },
+          { label: 'No', value: 'no' },
+        ]);
+        if (choice !== 'yes') return;
+        const selfBaseId = (ctx.custom[self]?.borrowedBaseId as string) ?? baseCharacterId(self);
+        const targetBaseId = (ctx.custom[targetId]?.borrowedBaseId as string) ?? baseCharacterId(targetId);
+        ctx.custom[self] = { ...ctx.custom[self], borrowedBaseId: targetBaseId };
+        ctx.custom[targetId] = { ...ctx.custom[targetId], borrowedBaseId: selfBaseId };
+        ctx.log(`🥼 ${ctx.describe(self)} and ${targetName} swap abilities in a flash of chemistry!`);
+      },
+    },
+  },
 ];
 
 /** True if `self` has the strictly highest position among all still-active racers. */
