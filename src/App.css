@@ -185,6 +185,14 @@
 }
 .action-log-entry {
   padding: 2px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.action-log-icon {
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #f0f0f0;
 }
 .action-log-tag {
   margin-right: 6px;
