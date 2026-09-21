@@ -59,7 +59,7 @@ interface GameStore {
   pendingDecision: Decision | null;
   isProcessingTurn: boolean;
   lastRaceResult: { first: string; second: string; raceIndex: number } | null;
-  winnerBaseIdHistory: string[]; // base character ids that have won a race this game (for Twin)
+  winnerBaseIdHistory: string[]; // base character ids that have won a race this game (for Twins)
 
   // internal (not for UI)
   _runtime: RaceRuntime | null;
@@ -339,7 +339,7 @@ export const useGameStore = create<GameStore>()(
       ],
     });
 
-    // Run any pre-race setup abilities (Egg's draw, Twin's copy, Boulder's
+    // Run any pre-race setup abilities (Egg's draw, Twins' copy, Boulder's
     // chips, Mastermind's prediction, ...) sequentially, then start the race.
     (async () => {
       const ctx = buildContext(runtime);

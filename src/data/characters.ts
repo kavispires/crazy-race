@@ -8,14 +8,14 @@ import type { AbilityContext, Character } from '../types';
  */
 export const CHARACTERS: Character[] = [
   {
-    id: 'alchemist',
-    name: 'Alchemist',
+    id: 'chemist',
+    name: 'Chemist',
     description: 'On a roll of 1-2, may transmute the roll into a flat move of 4.',
     tier: 2,
     abilities: {
       onRoll: async (ctx, self, roll) => {
         if (roll > 2) return roll;
-        const choice = await ctx.decide(self, 'Alchemist rolled low. Transmute into a move of 4?', [
+        const choice = await ctx.decide(self, 'Chemist rolled low. Transmute into a move of 4?', [
           { label: 'Yes, move 4', value: 'yes' },
           { label: 'No, keep roll', value: 'no' },
         ]);
@@ -132,15 +132,15 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'gunk',
-    name: 'Gunk',
+    id: 'slime',
+    name: 'Slime',
     description: 'A sticky aura slows every other racer by -1 on their rolls.',
     tier: 1,
     abilities: {
       onAnyTurnStart: (ctx, self, activeCharacterId) => {
         if (activeCharacterId === self) return;
-        const gunk = ctx.getRacer(self);
-        if (gunk.finished) return;
+        const slime = ctx.getRacer(self);
+        if (slime.finished) return;
         ctx.addRollModifier(activeCharacterId, -1);
       },
     },
@@ -160,7 +160,7 @@ export const CHARACTERS: Character[] = [
   },
   {
     id: 'mouth',
-    name: 'M.O.U.T.H.',
+    name: 'Mouth',
     description: 'If exactly one other racer shares its space at end of turn, eliminates them.',
     tier: 4,
     abilities: {
@@ -206,8 +206,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'baba-yaga',
-    name: 'Baba Yaga',
+    id: 'witch',
+    name: 'Witch',
     description: 'Trips any racer that stops on her space, or that she stops on.',
     tier: 2,
     abilities: {
@@ -383,8 +383,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'inchworm',
-    name: 'Inchworm',
+    id: 'worm',
+    name: 'Worm',
     description: "Whenever another racer rolls a 1, cancels their move and inches forward 1 itself.",
     tier: 3,
     abilities: {
@@ -397,8 +397,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'lackey',
-    name: 'Lackey',
+    id: 'squire',
+    name: 'Squire',
     description: 'Whenever another racer rolls a 6, moves 2 before they move.',
     tier: 3,
     abilities: {
@@ -410,13 +410,13 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'legs',
-    name: 'Legs',
+    id: 'leg',
+    name: 'Leg',
     description: 'Can skip rolling for the main move and move exactly 5 instead.',
     tier: 2,
     abilities: {
       onTurnStart: async (ctx, self) => {
-        const choice = await ctx.decide(self, 'Roll normally, or use Legs to move exactly 5?', [
+        const choice = await ctx.decide(self, 'Roll normally, or use Leg to move exactly 5?', [
           { label: 'Roll normally', value: 'roll' },
           { label: 'Move 5', value: 'move5' },
         ]);
@@ -427,8 +427,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'leaptoad',
-    name: 'Leaptoad',
+    id: 'frog',
+    name: 'Frog',
     description: 'While moving, hops over any space that has another racer on it.',
     tier: 2,
     abilities: {
@@ -528,8 +528,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'third-wheel',
-    name: 'Third Wheel',
+    id: 'wheel',
+    name: 'Wheel',
     description: 'Before its main move, may warp to any space occupied by exactly 2 racers.',
     tier: 2,
     abilities: {
@@ -549,18 +549,18 @@ export const CHARACTERS: Character[] = [
         );
         if (choice === 'stay') return;
         await ctx.setPosition(self, Number(choice));
-        ctx.log(`🛞 ${ctx.describe(self)} warps in as the third wheel!`);
+        ctx.log(`🛞 ${ctx.describe(self)} warps in as the extra wheel!`);
       },
     },
   },
   {
-    id: 'twin',
-    name: 'Twin',
+    id: 'twins',
+    name: 'Twins',
     description: "At the start of the race, may copy the power of a racer that won a previous race.",
     tier: 2,
     abilities: {
       onRaceSetup: async (ctx, self) => {
-        const winners = [...new Set(ctx.getPreviousWinnerBaseIds())].filter((id) => id !== 'twin');
+        const winners = [...new Set(ctx.getPreviousWinnerBaseIds())].filter((id) => id !== 'twins');
         if (winners.length === 0) {
           ctx.log(`👯 ${ctx.describe(self)} has no past winners to copy yet.`);
           return;

@@ -31,9 +31,9 @@ export interface RaceRuntime {
   rerollUsedThisTurn: boolean;
   /** Free-form per-character scratch space that persists for the whole race. */
   custom: Record<string, Record<string, unknown>>;
-  /** Base character ids that won a previous race this game (for Twin). */
+  /** Base character ids that won a previous race this game (for Twins). */
   previousWinnerBaseIds: string[];
-  /** Set by a reactive ability (e.g. Inchworm) to cancel the active racer's pending move this turn. */
+  /** Set by a reactive ability (e.g. Worm) to cancel the active racer's pending move this turn. */
   pendingMoveCancelled: boolean;
 }
 
@@ -65,7 +65,7 @@ function character(id: string): Character {
  * this is just the racer's own character, but a few racers borrow another
  * character's abilities for the whole race:
  *  - Copy Cat dynamically mirrors whoever is currently in the lead.
- *  - Egg / Twin pick a fixed ability at race setup (stored in `runtime.custom`).
+ *  - Egg / Twins pick a fixed ability at race setup (stored in `runtime.custom`).
  */
 export function effectiveCharacter(runtime: RaceRuntime, characterId: string): Character {
   const own = character(characterId);
@@ -172,7 +172,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       }
     }
 
-    // Leaptoad: skip over any space currently occupied by another racer.
+    // Frog: skip over any space currently occupied by another racer.
     if (effectiveCharacter(runtime, characterId).abilities.skipOccupiedSpaces && !opts?.silent && delta !== 0) {
       const dir = delta > 0 ? 1 : -1;
       let steps = Math.abs(delta);

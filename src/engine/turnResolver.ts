@@ -102,7 +102,7 @@ export async function playTurn(
   }
 
   // 4b. Reactive hooks fired to every other racer right after the roll is known
-  // but before movement is applied (Lackey, Inchworm, Skipper, Octopus). Skipped
+  // but before movement is applied (Squire, Worm, Skipper, Octopus). Skipped
   // entirely if the roller is immune (Panda can't be cancelled/targeted).
   if (!isImmune(runtime, characterId)) {
     for (const other of Object.values(runtime.racers)) {
@@ -121,7 +121,7 @@ export async function playTurn(
     await ctx.move(characterId, moveValue);
   }
 
-  // 5. End-of-turn hook for the active racer (e.g. M.O.U.T.H., Scientist).
+  // 5. End-of-turn hook for the active racer (e.g. Mouth, Scientist).
   const onTurnEnd = effectiveCharacter(runtime, characterId).abilities.onTurnEnd;
   if (onTurnEnd) {
     await onTurnEnd(ctx, characterId);

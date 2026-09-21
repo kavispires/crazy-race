@@ -104,11 +104,11 @@ export interface AbilityContext {
   /** Awards a bronze (+1 point) chip to a racer's owner, same as landing on a star tile. */
   grantBronzeChip: (characterId: string) => void;
   removeBronzeChip: (characterId: string) => void;
-  /** Cancels the active racer's pending main move for this turn (used reactively, e.g. Inchworm). */
+  /** Cancels the active racer's pending main move for this turn (used reactively, e.g. Worm). */
   cancelPendingMove: () => void;
   /** Requests that `characterId` take the very next turn, ahead of normal turn order (Skipper, Genius). */
   requestPriorityTurn: (characterId: string) => void;
-  /** Base character ids that won a previous race this game (for Twin). */
+  /** Base character ids that won a previous race this game (for Twins). */
   getPreviousWinnerBaseIds: () => string[];
 }
 
@@ -154,7 +154,7 @@ export interface CharacterAbilities {
   onOtherTurnEnd?: (ctx: AbilityContext, self: string, other: string, spacesMoved: number) => Promise<void> | void;
   /**
    * Fired for every racer (including the active one, with activeCharacterId === self)
-   * whenever ANY racer's turn is about to start. Used for passive auras (e.g. Coach, Gunk).
+   * whenever ANY racer's turn is about to start. Used for passive auras (e.g. Coach, Slime).
    */
   onAnyTurnStart?: (ctx: AbilityContext, self: string, activeCharacterId: string) => Promise<void> | void;
 }
