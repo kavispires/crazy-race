@@ -61,8 +61,11 @@ export async function playTurn(
   }
 
   // 2. Active racer's own onTurnStart hook (e.g. Cheerleader's rally prompt).
-  await effectiveCharacter(runtime, characterId).abilities.onTurnStart?.(ctx, characterId);
-  notifyAbilityResolve(runtime, ctx, characterId);
+  const onTurnStart = effectiveCharacter(runtime, characterId).abilities.onTurnStart;
+  if (onTurnStart) {
+    await onTurnStart(ctx, characterId);
+    notifyAbilityResolve(runtime, ctx, characterId);
+  }
 
   // 3. Handle tripping: skip this turn's move, stand back up, end turn immediately.
   if (racer.tripped) {
@@ -119,8 +122,11 @@ export async function playTurn(
   }
 
   // 5. End-of-turn hook for the active racer (e.g. M.O.U.T.H., Scientist).
-  await effectiveCharacter(runtime, characterId).abilities.onTurnEnd?.(ctx, characterId);
-  notifyAbilityResolve(runtime, ctx, characterId);
+  const onTurnEnd = effectiveCharacter(runtime, characterId).abilities.onTurnEnd;
+  if (onTurnEnd) {
+    await onTurnEnd(ctx, characterId);
+    notifyAbilityResolve(runtime, ctx, characterId);
+  }
 
   // 5b. Genius: if it correctly predicted its own roll, it takes another turn.
   if (runtime.custom[characterId]?.geniusExtraTurn) {

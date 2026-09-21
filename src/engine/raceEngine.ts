@@ -224,22 +224,25 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
         if (isImmune(runtime, characterId) || isImmune(runtime, otherId)) continue;
         const selfAbilities = effectiveCharacter(runtime, characterId).abilities;
         const otherAbilities = effectiveCharacter(runtime, otherId).abilities;
-        await selfAbilities.onPass?.(ctx, characterId, otherId);
-        notifyAbilityResolve(characterId);
-        await otherAbilities.onPassedBy?.(ctx, otherId, characterId);
-        notifyAbilityResolve(otherId);
+        if (selfAbilities.onPass) {
+          await selfAbilities.onPass(ctx, characterId, otherId);
+          notifyAbilityResolve(characterId);
+        }
+        if (otherAbilities.onPassedBy) {
+          await otherAbilities.onPassedBy(ctx, otherId, characterId);
+          notifyAbilityResolve(otherId);
+        }
       }
 
       // Suckerfish: racers left behind at the old space may follow to the new one.
       if (!isImmune(runtime, characterId)) {
         for (const stayer of stationaryAtFrom) {
           if (stayer.finished || stayer.position !== from) continue;
-          await effectiveCharacter(runtime, stayer.characterId).abilities.onSharedDeparture?.(
-            ctx,
-            stayer.characterId,
-            characterId,
-          );
-          notifyAbilityResolve(stayer.characterId);
+          const onSharedDeparture = effectiveCharacter(runtime, stayer.characterId).abilities.onSharedDeparture;
+          if (onSharedDeparture) {
+            await onSharedDeparture(ctx, stayer.characterId, characterId);
+            notifyAbilityResolve(stayer.characterId);
+          }
         }
       }
     }
@@ -282,22 +285,24 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       for (const other of sharing) {
         const selfAbilities = effectiveCharacter(runtime, characterId).abilities;
         const otherAbilities = effectiveCharacter(runtime, other.characterId).abilities;
-        await selfAbilities.onShareSpace?.(ctx, characterId, other.characterId);
-        notifyAbilityResolve(characterId);
-        await otherAbilities.onShareSpace?.(ctx, other.characterId, characterId);
-        notifyAbilityResolve(other.characterId);
+        if (selfAbilities.onShareSpace) {
+          await selfAbilities.onShareSpace(ctx, characterId, other.characterId);
+          notifyAbilityResolve(characterId);
+        }
+        if (otherAbilities.onShareSpace) {
+          await otherAbilities.onShareSpace(ctx, other.characterId, characterId);
+          notifyAbilityResolve(other.characterId);
+        }
       }
       if (sharing.length === 1) {
         const otherId = sharing[0].characterId;
         for (const third of Object.values(runtime.racers)) {
           if (third.finished || third.characterId === characterId || third.characterId === otherId) continue;
-          await effectiveCharacter(runtime, third.characterId).abilities.onAnyShareSpace?.(
-            ctx,
-            third.characterId,
-            characterId,
-            otherId,
-          );
-          notifyAbilityResolve(third.characterId);
+          const onAnyShareSpace = effectiveCharacter(runtime, third.characterId).abilities.onAnyShareSpace;
+          if (onAnyShareSpace) {
+            await onAnyShareSpace(ctx, third.characterId, characterId, otherId);
+            notifyAbilityResolve(third.characterId);
+          }
         }
       }
     }
