@@ -97,13 +97,13 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'dicemonger',
-    name: 'Dicemonger',
+    id: 'dice',
+    name: 'Dice',
     description: 'Offers a once-per-turn reroll to anyone; moves 1 whenever someone else uses it.',
     tier: 2,
     abilities: {
       // Reroll usage is handled globally by the engine (see engine/turnResolver.ts),
-      // which calls notifyDicemongerReroll() whenever another racer rerolls.
+      // which calls useDiceReroll() whenever another racer rerolls.
     },
   },
   {
@@ -177,8 +177,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'rocket-scientist',
-    name: 'Rocket Scientist',
+    id: 'scientist',
+    name: 'Scientist',
     description: 'Doubles every roll, but trips after each launch.',
     tier: 1,
     abilities: {
@@ -193,8 +193,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'scoocher',
-    name: 'Scoocher',
+    id: 'zombie',
+    name: 'Zombie',
     description: 'Scoots forward 1 space whenever another character resolves an ability.',
     tier: 2,
     abilities: {
@@ -340,8 +340,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'huge-baby',
-    name: 'Huge Baby',
+    id: 'baby',
+    name: 'Baby',
     description: 'No one else may share its space (except the start). They land one space behind instead.',
     tier: 2,
     abilities: {
@@ -436,8 +436,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'lovable-loser',
-    name: 'Lovable Loser',
+    id: 'loser',
+    name: 'Loser',
     description: 'At the start of its turn, gets a bronze chip if alone in last place.',
     tier: 4,
     abilities: {
@@ -606,8 +606,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'sisyphus',
-    name: 'Sisyphus',
+    id: 'boulder',
+    name: 'Boulder',
     description: 'Starts with 4 bonus chips. Rolling a 6 sends it back to Start and costs it a chip instead of moving.',
     tier: 2,
     abilities: {
@@ -635,8 +635,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'apparition',
-    name: 'Apparition',
+    id: 'spirit',
+    name: 'Spirit',
     description: 'At the start of its turn, moves 1 space for every racer currently ahead of it.',
     tier: 2,
     abilities: {
@@ -1008,8 +1008,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'scientist',
-    name: 'Scientist',
+    id: 'portal',
+    name: 'Portal',
     description: 'At the start of its turn, may permanently swap abilities with a racer sharing its space.',
     tier: 2,
     abilities: {

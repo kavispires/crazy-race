@@ -144,7 +144,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
     const racer = runtime.racers[characterId];
     if (!racer || racer.finished) return;
     const depth = opts?.depth ?? 0;
-    // Safety valve: an arrow hazard and a landing-redirect ability (e.g. Huge Baby) can bounce a
+    // Safety valve: an arrow hazard and a landing-redirect ability (e.g. Baby) can bounce a
     // racer back and forth forever (arrow pushes onto the redirect target, which pushes right back
     // onto the arrow). If we recurse too deep, stop chaining and just settle in place.
     if (depth > 25) {
@@ -195,7 +195,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       to = pos;
     }
 
-    // Huge Baby / Guard: let others redirect where the mover would land (immune racers ignore this).
+    // Baby / Guard: let others redirect where the mover would land (immune racers ignore this).
     if (to !== 0 && !isImmune(runtime, characterId)) {
       for (const other of Object.values(runtime.racers)) {
         if (other.characterId === characterId || other.finished) continue;

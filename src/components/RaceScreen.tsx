@@ -64,8 +64,8 @@ export default function RaceScreen() {
   const activeCharacterId = turnOrder[turnPointer % turnOrder.length];
   const activeRacer = racers[activeCharacterId];
   const activeOwner = players.find((p) => p.id === activeRacer?.ownerId);
-  const dicemongerCharacterId = Object.keys(racers).find((id) => getCharacter(id).id === 'dicemonger');
-  const hasDicemonger = !!dicemongerCharacterId && !racers[dicemongerCharacterId]?.finished;
+  const diceCharacterId = Object.keys(racers).find((id) => getCharacter(id).id === 'dice');
+  const hasDice = !!diceCharacterId && !racers[diceCharacterId]?.finished;
 
   // Each racer keeps a fixed lane (row) for the whole race, based on their
   // stable position in turnOrder, so they're always easy to track visually
@@ -156,9 +156,9 @@ export default function RaceScreen() {
           )}
         </div>
         <div className="control-buttons">
-          {hasDicemonger && activeCharacterId !== dicemongerCharacterId && (
+          {hasDice && activeCharacterId !== diceCharacterId && (
             <Button onClick={() => useReroll()} disabled={isProcessingTurn || !!pendingDecision}>
-              Use Dicemonger reroll
+              Use Dice reroll
             </Button>
           )}
           <Button

@@ -20,21 +20,21 @@ function notifyAbilityResolve(runtime: RaceRuntime, ctx: AbilityContext, trigger
   }
 }
 
-/** Grants a reroll of the active racer's die to another racer's owner; moves the Dicemonger +1. */
-export async function useDicemongerReroll(
+/** Grants a reroll of the active racer's die to another racer's owner; moves Dice +1. */
+export async function useDiceReroll(
   runtime: RaceRuntime,
   ctx: AbilityContext,
   requesterCharacterId: string,
 ): Promise<number> {
   runtime.rerollUsedThisTurn = true;
   const newRoll = rollDie();
-  ctx.log(`🎲 ${ctx.describe(requesterCharacterId)} uses Dicemonger's reroll: ${newRoll}!`, 'ability');
-  const dicemongerId = Object.keys(runtime.racers).find(
-    (id) => getCharacter(id).id === 'dicemonger',
+  ctx.log(`🎲 ${ctx.describe(requesterCharacterId)} uses Dice's reroll: ${newRoll}!`, 'ability');
+  const diceId = Object.keys(runtime.racers).find(
+    (id) => getCharacter(id).id === 'dice',
   );
-  if (dicemongerId && dicemongerId !== requesterCharacterId && !runtime.racers[dicemongerId].finished) {
-    await ctx.move(dicemongerId, 1);
-    ctx.log(`${ctx.describe(dicemongerId)} shuffles forward 1 space, pocketing the fee.`, 'ability');
+  if (diceId && diceId !== requesterCharacterId && !runtime.racers[diceId].finished) {
+    await ctx.move(diceId, 1);
+    ctx.log(`${ctx.describe(diceId)} shuffles forward 1 space, pocketing the fee.`, 'ability');
   }
   return newRoll;
 }
@@ -118,7 +118,7 @@ export async function playTurn(
     await ctx.move(characterId, moveValue);
   }
 
-  // 5. End-of-turn hook for the active racer (e.g. M.O.U.T.H., Rocket Scientist).
+  // 5. End-of-turn hook for the active racer (e.g. M.O.U.T.H., Scientist).
   await effectiveCharacter(runtime, characterId).abilities.onTurnEnd?.(ctx, characterId);
   notifyAbilityResolve(runtime, ctx, characterId);
 

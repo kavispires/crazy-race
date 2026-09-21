@@ -133,7 +133,7 @@ export interface CharacterAbilities {
   onAnyShareSpace?: (ctx: AbilityContext, self: string, moverId: string, otherId: string) => Promise<void> | void;
   /** Fired to a stationary racer sharing self's old space when self departs it. */
   onSharedDeparture?: (ctx: AbilityContext, self: string, mover: string) => Promise<void> | void;
-  /** Lets a passive racer redirect where another racer is about to land (e.g. Huge Baby). Return the adjusted position, or undefined to leave unchanged. */
+  /** Lets a passive racer redirect where another racer is about to land (e.g. Baby). Return the adjusted position, or undefined to leave unchanged. */
   adjustLanding?: (
     ctx: AbilityContext,
     self: string,

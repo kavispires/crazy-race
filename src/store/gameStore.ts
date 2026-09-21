@@ -3,7 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { getCharacter, makeCharacterPool, baseCharacterId } from '../data/characters';
 import { CHIP_VALUES, TRACKS } from '../data/tracks';
 import { buildContext, createInitialRacers, type RaceRuntime } from '../engine/raceEngine';
-import { isRaceOver, playTurn, useDicemongerReroll } from '../engine/turnResolver';
+import { isRaceOver, playTurn, useDiceReroll } from '../engine/turnResolver';
 import { aiDraftPick, aiSecretSelect } from '../ai/ai';
 import type {
   Decision,
@@ -323,7 +323,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       ],
     });
 
-    // Run any pre-race setup abilities (Egg's draw, Twin's copy, Sisyphus's
+    // Run any pre-race setup abilities (Egg's draw, Twin's copy, Boulder's
     // chips, Mastermind's prediction, ...) sequentially, then start the race.
     (async () => {
       const ctx = buildContext(runtime);
@@ -389,7 +389,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const characterId = order[state.turnPointer % order.length];
     if (state._runtime.rerollUsedThisTurn) return;
     const ctx = buildContext(state._runtime);
-    await useDicemongerReroll(state._runtime, ctx, characterId);
+    await useDiceReroll(state._runtime, ctx, characterId);
     set({ racers: { ...state._runtime.racers } });
   },
 
