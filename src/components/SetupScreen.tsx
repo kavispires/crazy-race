@@ -73,7 +73,7 @@ export default function SetupScreen() {
             gap: 8,
           }}
         >
-          {CHARACTERS.map((c) => (
+          {[...CHARACTERS].sort((a, b) => a.name.localeCompare(b.name)).map((c) => (
             <Tooltip key={c.id} title={`${c.name}: ${c.description}`}>
               <div
                 style={{

@@ -89,7 +89,7 @@ export function effectiveCharacter(runtime: RaceRuntime, characterId: string): C
   return own;
 }
 
-/** True if this racer (e.g. Honey Badger) is completely unaffected by other characters' abilities. */
+/** True if this racer (e.g. Panda) is completely unaffected by other characters' abilities. */
 export function isImmune(runtime: RaceRuntime, characterId: string): boolean {
   return effectiveCharacter(runtime, characterId).abilities.immune === true;
 }
@@ -127,16 +127,16 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
     }
   };
 
-  const checkGreekPrediction = () => {
+  const checkSeerPrediction = () => {
     const active = Object.values(runtime.racers).filter((r) => !r.finished);
     if (active.length === 0) return;
     const last = active.reduce((a, b) => (a.position <= b.position ? a : b));
-    for (const [greekId, data] of Object.entries(runtime.custom)) {
-      if (data?.greekPredictedLast !== last.characterId) continue;
-      runtime.callbacks.onStarCollected(greekId);
-      runtime.callbacks.onStarCollected(greekId);
-      runtime.callbacks.onStarCollected(greekId);
-      log(`🏺 ${describe(greekId)} correctly predicted ${describe(last.characterId)} would finish last and earns 3 bonus chips!`, 'ability');
+    for (const [seerId, data] of Object.entries(runtime.custom)) {
+      if (data?.seerPredictedLast !== last.characterId) continue;
+      runtime.callbacks.onStarCollected(seerId);
+      runtime.callbacks.onStarCollected(seerId);
+      runtime.callbacks.onStarCollected(seerId);
+      log(`🔮 ${describe(seerId)} correctly predicted ${describe(last.characterId)} would finish last and earns 3 bonus chips!`, 'ability');
     }
   };
 
@@ -195,7 +195,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       to = pos;
     }
 
-    // Huge Baby / Argus: let others redirect where the mover would land (immune racers ignore this).
+    // Huge Baby / Guard: let others redirect where the mover would land (immune racers ignore this).
     if (to !== 0 && !isImmune(runtime, characterId)) {
       for (const other of Object.values(runtime.racers)) {
         if (other.characterId === characterId || other.finished) continue;
@@ -220,7 +220,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
 
     if (!opts?.silent) {
       for (const otherId of passedCharacterIds) {
-        // Honey Badger-style immunity: neither side of a pass interaction fires if either racer is immune.
+        // Panda-style immunity: neither side of a pass interaction fires if either racer is immune.
         if (isImmune(runtime, characterId) || isImmune(runtime, otherId)) continue;
         const selfAbilities = effectiveCharacter(runtime, characterId).abilities;
         const otherAbilities = effectiveCharacter(runtime, otherId).abilities;
@@ -253,7 +253,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       log(`🏁 ${describe(characterId)} crosses the finish line in ${place} place!`, 'finish');
       runtime.callbacks.onRacersChange({ ...runtime.racers });
       if (racer.finishOrder === 0) checkMastermindPrediction(characterId);
-      if (runtime.finishedCharacterIds.length === 2) checkGreekPrediction();
+      if (runtime.finishedCharacterIds.length === 2) checkSeerPrediction();
       return;
     }
 

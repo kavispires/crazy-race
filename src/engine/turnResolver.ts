@@ -52,7 +52,7 @@ export async function playTurn(
   ctx.log(`▶ ${ctx.describe(characterId)}'s turn (space ${racer.position}/${ctx.trackLength})`, 'turn');
 
   // 1. Passive auras fire for every racer before the active racer acts (skipped entirely if the
-  // active racer is immune, e.g. Honey Badger, since it can't be affected by others' abilities).
+  // active racer is immune, e.g. Panda, since it can't be affected by others' abilities).
   if (!isImmune(runtime, characterId)) {
     for (const other of Object.values(runtime.racers)) {
       if (other.finished) continue;
@@ -99,8 +99,8 @@ export async function playTurn(
   }
 
   // 4b. Reactive hooks fired to every other racer right after the roll is known
-  // but before movement is applied (Lackey, Inchworm, Skipper, Cecaelia). Skipped
-  // entirely if the roller is immune (Honey Badger can't be cancelled/targeted).
+  // but before movement is applied (Lackey, Inchworm, Skipper, Octopus). Skipped
+  // entirely if the roller is immune (Panda can't be cancelled/targeted).
   if (!isImmune(runtime, characterId)) {
     for (const other of Object.values(runtime.racers)) {
       if (other.characterId === characterId || other.finished) continue;
@@ -129,8 +129,8 @@ export async function playTurn(
     ctx.requestPriorityTurn(characterId);
   }
 
-  // 6. Reactive hooks for every other still-active racer (e.g. Heckler, Allosaurus).
-  // Skipped if the just-finished turn belongs to an immune racer (Honey Badger).
+  // 6. Reactive hooks for every other still-active racer (e.g. Heckler, Raptor).
+  // Skipped if the just-finished turn belongs to an immune racer (Panda).
   if (!isImmune(runtime, characterId)) {
     for (const other of Object.values(runtime.racers)) {
       if (other.characterId === characterId || other.finished) continue;

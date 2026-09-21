@@ -651,15 +651,15 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'argus',
-    name: 'Argus',
+    id: 'guard',
+    name: 'Guard',
     description:
       "Racers can't pass its space unless they started their move there (they stop on it instead); trips if 2+ racers start a turn on its space.",
     tier: 2,
     abilities: {
       onTurnStart: (ctx, self) => {
-        const argusPos = ctx.getRacer(self).position;
-        const occupants = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished && r.position === argusPos);
+        const guardPos = ctx.getRacer(self).position;
+        const occupants = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished && r.position === guardPos);
         if (occupants.length >= 2) {
           ctx.setTripped(self, true);
           ctx.log(`👁️ ${ctx.describe(self)} is surrounded by a crowd and trips!`);
@@ -667,22 +667,22 @@ export const CHARACTERS: Character[] = [
       },
       adjustLanding: (ctx, self, mover, proposedPosition) => {
         if (mover === self) return undefined;
-        const argusPos = ctx.getRacer(self).position;
+        const guardPos = ctx.getRacer(self).position;
         const movingFrom = ctx.getRacer(mover).position;
-        if (movingFrom === argusPos) return undefined; // started here, free to pass through
-        const crossesForward = movingFrom < argusPos && argusPos < proposedPosition;
-        const crossesBackward = movingFrom > argusPos && argusPos > proposedPosition;
+        if (movingFrom === guardPos) return undefined; // started here, free to pass through
+        const crossesForward = movingFrom < guardPos && guardPos < proposedPosition;
+        const crossesBackward = movingFrom > guardPos && guardPos > proposedPosition;
         if (crossesForward || crossesBackward) {
           ctx.log(`👁️ ${ctx.describe(self)}'s watchful eye stops ${ctx.describe(mover)} in their tracks!`);
-          return argusPos;
+          return guardPos;
         }
         return undefined;
       },
     },
   },
   {
-    id: 'banshee',
-    name: 'Banshee',
+    id: 'ghost',
+    name: 'Ghost',
     description: 'At the start of its turn, may warp any racer to the space directly behind it.',
     tier: 2,
     abilities: {
@@ -707,8 +707,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'allosaurus',
-    name: 'Allosaurus',
+    id: 'raptor',
+    name: 'Raptor',
     description: 'Whenever another racer moves exactly 4 spaces on their turn, also moves 4.',
     tier: 3,
     abilities: {
@@ -720,8 +720,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'cecaelia',
-    name: 'Cecaelia',
+    id: 'octopus',
+    name: 'Octopus',
     description: 'Whenever anyone rolls a 3 for their main move, moves 4. Whenever anyone rolls a 5, moves -4.',
     tier: 2,
     abilities: {
@@ -754,8 +754,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'greek',
-    name: 'Greek',
+    id: 'seer',
+    name: 'Seer',
     description: 'Before the race, predicts who will finish last. If correct, earns 3 bonus chips.',
     tier: 2,
     abilities: {
@@ -767,14 +767,14 @@ export const CHARACTERS: Character[] = [
           'Predict who will finish LAST in this race:',
           others.map((r) => ({ label: ctx.describe(r.characterId), value: r.characterId })),
         );
-        ctx.custom[self] = { ...ctx.custom[self], greekPredictedLast: choice };
-        ctx.log(`🏺 ${ctx.describe(self)} secretly predicts ${ctx.describe(choice)} will finish last!`);
+        ctx.custom[self] = { ...ctx.custom[self], seerPredictedLast: choice };
+        ctx.log(`🔮 ${ctx.describe(self)} secretly predicts ${ctx.describe(choice)} will finish last!`);
       },
     },
   },
   {
-    id: 'honey-badger',
-    name: 'Honey Badger',
+    id: 'panda',
+    name: 'Panda',
     description: "Completely unaffected by every other racer's ability, and never considered to be sharing a space.",
     tier: 1,
     abilities: {
@@ -844,8 +844,8 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'rhinoceros',
-    name: 'Rhinoceros',
+    id: 'rhino',
+    name: 'Rhino',
     description: 'If it rolls a 1, keeps rolling and adding to the total until something other than a 1 comes up.',
     tier: 2,
     abilities: {
@@ -862,22 +862,22 @@ export const CHARACTERS: Character[] = [
     },
   },
   {
-    id: 'nyx',
-    name: 'Nyx',
+    id: 'night-owl',
+    name: 'Night Owl',
     description: 'If it passes every other active racer in a single move, instantly warps to the finish line.',
     tier: 1,
     abilities: {
       onTurnStart: (ctx, self) => {
-        ctx.custom[self] = { ...ctx.custom[self], nyxPassedThisTurn: [] };
+        ctx.custom[self] = { ...ctx.custom[self], nightOwlPassedThisTurn: [] };
       },
       onPass: (ctx, self, other) => {
         const data = ctx.custom[self] ?? {};
-        const passed = Array.isArray(data.nyxPassedThisTurn) ? (data.nyxPassedThisTurn as string[]) : [];
-        ctx.custom[self] = { ...data, nyxPassedThisTurn: [...passed, other] };
+        const passed = Array.isArray(data.nightOwlPassedThisTurn) ? (data.nightOwlPassedThisTurn as string[]) : [];
+        ctx.custom[self] = { ...data, nightOwlPassedThisTurn: [...passed, other] };
       },
       onTurnEnd: async (ctx, self) => {
         const data = ctx.custom[self];
-        const passed = Array.isArray(data?.nyxPassedThisTurn) ? (data!.nyxPassedThisTurn as string[]) : [];
+        const passed = Array.isArray(data?.nightOwlPassedThisTurn) ? (data!.nightOwlPassedThisTurn as string[]) : [];
         const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
         if (others.length > 0 && new Set(passed).size >= others.length) {
           ctx.log(`🌙 ${ctx.describe(self)} slips past everyone in the dark and warps straight to the finish!`);
@@ -903,7 +903,7 @@ function isAloneInLast(ctx: AbilityContext, self: string): boolean {
   return others.every((r) => r.position > selfPos);
 }
 
-/** True if this racer's base character is immune to other characters' abilities (e.g. Honey Badger). */
+/** True if this racer's base character is immune to other characters' abilities (e.g. Panda). */
 function isImmuneRacer(characterId: string): boolean {
   return CHARACTER_MAP[baseCharacterId(characterId)]?.abilities.immune === true;
 }
