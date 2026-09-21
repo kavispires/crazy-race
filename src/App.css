@@ -1,0 +1,204 @@
+.app-shell {
+  min-height: 100vh;
+  padding: 16px 24px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #f5f7ff 0%, #eef1fb 100%);
+}
+
+.screen-center {
+  max-width: 900px;
+  margin: 40px auto;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.character-card {
+  text-align: center;
+}
+.character-card-icon {
+  margin-bottom: 4px;
+}
+.character-card.clickable {
+  cursor: pointer;
+  border-color: #1677ff;
+}
+.character-name {
+  font-weight: 600;
+}
+.character-desc {
+  font-size: 12px;
+  color: #666;
+  margin: 4px 0;
+  min-height: 34px;
+}
+
+.reveal-card {
+  border: 1px solid #d6d9f5;
+  border-radius: 8px;
+  padding: 12px;
+  background: white;
+  text-align: center;
+}
+
+.draft-screen {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.draft-turn {
+  font-size: 14px;
+  color: #1677ff;
+  font-weight: 400;
+}
+
+.roster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.roster-card .ant-tag {
+  margin-bottom: 4px;
+}
+
+.race-screen {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.track-wrapper {
+  width: 100%;
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+.track-lane {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  background: #f4f6fd;
+  border: 2px solid #b8c2e8;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.track-space {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  font-size: 16px;
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.track-space-hazard {
+  background: #fffaf0;
+  border: 2px solid #8b5cf6;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.finish-flag {
+  position: absolute;
+  top: 2px;
+}
+.hazard-icon {
+  position: absolute;
+  bottom: 4px;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+.hazard-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #5b21b6;
+}
+
+.racer-token {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(-50%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+.racer-token img {
+  border-radius: 50%;
+}
+.racer-token.active {
+  outline: 3px solid gold;
+}
+.racer-token.tripped img {
+  transform: rotate(90deg);
+  opacity: 0.7;
+}
+
+.race-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.action-log {
+  max-width: 100%;
+}
+.action-log-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+}
+.action-log-entry {
+  padding: 2px 0;
+}
+.action-log-tag {
+  margin-right: 6px;
+}
+.action-log-turn {
+  border-top: 1px solid #d6d9f5;
+  margin-top: 6px;
+  padding-top: 6px;
+  font-weight: 600;
+  color: #1677ff;
+}
+.action-log-finish {
+  font-weight: 700;
+  color: #ad6800;
+}
+.action-log-hazard {
+  color: #ad4e00;
+}
+.log-legend {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.log-legend-title {
+  font-weight: 600;
+  margin-right: 4px;
+}
