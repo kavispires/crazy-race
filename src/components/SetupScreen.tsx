@@ -17,7 +17,7 @@ export default function SetupScreen() {
   return (
     <div className="screen-center">
       <Card style={{ maxWidth: 640, width: '100%' }}>
-        <Title level={2}>Magical Athlete</Title>
+        <Title level={2}>Crazy Race</Title>
         <Paragraph>
           Draft racers, keep their abilities secret, and win chips across four races. Set up your
           solo game against AI opponents below.

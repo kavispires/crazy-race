@@ -16,7 +16,7 @@ export default function FinalScreen() {
 
   return (
     <div className="screen-center">
-      <Title level={2}>🏆 {players[0]?.name} wins the Magical Athlete!</Title>
+      <Title level={2}>🏆 {players[0]?.name} wins Crazy Race!</Title>
       <Table columns={columns} dataSource={data} pagination={false} />
       <Button type="primary" size="large" style={{ marginTop: 16 }} onClick={() => restart()}>
         Play Again
