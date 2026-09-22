@@ -22,20 +22,27 @@ export default function RaceResultScreen() {
   }, [actionLog, raceIndex]);
 
   const columns = [
-    { title: 'Player', dataIndex: 'name', key: 'name' },
-    { title: 'Chips this race', dataIndex: 'raceChips', key: 'raceChips' },
-    { title: 'Total score', dataIndex: 'score', key: 'score' },
+    { title: 'Player', dataIndex: 'name', key: 'name', sorter: (a: (typeof data)[number], b: (typeof data)[number]) => a.name.localeCompare(b.name) },
+    {
+      title: 'Chips this race',
+      dataIndex: 'raceChips',
+      key: 'raceChips',
+      sorter: (a: (typeof data)[number], b: (typeof data)[number]) => a.raceChipsPoints - b.raceChipsPoints,
+      defaultSortOrder: 'descend' as const,
+    },
+    { title: 'Total score', dataIndex: 'score', key: 'score', sorter: (a: (typeof data)[number], b: (typeof data)[number]) => a.score - b.score },
   ];
 
-  const data = players.map((p) => ({
-    key: p.id,
-    name: p.name,
-    raceChips: p.chips
-      .filter((c) => c.raceIndex === raceIndex)
-      .map((c) => `${c.type} (+${c.points})`)
-      .join(', ') || '—',
-    score: p.score,
-  }));
+  const data = players.map((p) => {
+    const raceChips = p.chips.filter((c) => c.raceIndex === raceIndex);
+    return {
+      key: p.id,
+      name: p.name,
+      raceChips: raceChips.map((c) => `${c.type} (+${c.points})`).join(', ') || '—',
+      raceChipsPoints: raceChips.reduce((a, c) => a + c.points, 0),
+      score: p.score,
+    };
+  });
 
   return (
     <div className="screen-center">
