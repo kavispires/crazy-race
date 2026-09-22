@@ -355,6 +355,13 @@ export const CHARACTERS: Character[] = [
         }
         return undefined;
       },
+      // Baby itself moving onto someone else's space: that racer gets bumped back instead of sharing.
+      onShareSpace: async (ctx, self, other) => {
+        const otherRacer = ctx.getRacer(other);
+        if (otherRacer.finished || otherRacer.position === 0) return;
+        ctx.log(`👶 ${ctx.describe(self)} won't share the space! ${ctx.describe(other)} is bumped back a step.`);
+        await ctx.setPosition(other, otherRacer.position - 1);
+      },
     },
   },
   {
