@@ -15,6 +15,9 @@ import type {
   Track,
 } from '../types';
 
+/** How long to wait after the 2nd racer finishes, so its move/celebration animation can play before cutting to results. */
+const FINISH_ANIMATION_DELAY_MS = 900;
+
 /** Converts a 0-based index into a spreadsheet-style letter label: 0->A, 25->Z, 26->AA, 27->AB, ... */
 function botLetter(index: number): string {
   let n = index;
@@ -365,8 +368,15 @@ export const useGameStore = create<GameStore>()(
       set({ isProcessingTurn: true, priorityQueue: restQueue });
       const ctx = buildContext(runtime);
       await playTurn(runtime, ctx, characterId);
-      set({ racers: { ...runtime.racers }, isProcessingTurn: false });
-      if (isRaceOver(runtime)) get().finishRace();
+      set({ racers: { ...runtime.racers } });
+      if (isRaceOver(runtime)) {
+        // Let the finishing racer's move/celebration animation play before cutting to results.
+        await new Promise((resolve) => setTimeout(resolve, FINISH_ANIMATION_DELAY_MS));
+        set({ isProcessingTurn: false });
+        get().finishRace();
+        return;
+      }
+      set({ isProcessingTurn: false });
       return;
     }
 
@@ -390,6 +400,8 @@ export const useGameStore = create<GameStore>()(
     set({ racers: { ...runtime.racers } });
 
     if (isRaceOver(runtime)) {
+      // Let the finishing racer's move/celebration animation play before cutting to results.
+      await new Promise((resolve) => setTimeout(resolve, FINISH_ANIMATION_DELAY_MS));
       set({ isProcessingTurn: false });
       get().finishRace();
       return;

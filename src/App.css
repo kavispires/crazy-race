@@ -169,6 +169,70 @@
     transform: rotate(405deg);
   }
 }
+.racer-token.finished {
+  outline: 3px solid #eab308;
+  box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.35), 0 2px 4px rgba(0, 0, 0, 0.25);
+  animation: finish-celebrate 0.7s ease-out;
+}
+@keyframes finish-celebrate {
+  0% {
+    transform: translateX(-50%) scale(1);
+  }
+  35% {
+    transform: translateX(-50%) scale(1.5);
+  }
+  60% {
+    transform: translateX(-50%) scale(0.9);
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+}
+.finish-sparkle {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  pointer-events: none;
+  animation: finish-sparkle-pop 0.9s ease-out forwards;
+}
+@keyframes finish-sparkle-pop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px) scale(0.4);
+  }
+  40% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-6px) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-18px) scale(1);
+  }
+}
+.racer-token.eliminated {
+  background: #1f1f1f;
+  pointer-events: none;
+  animation: eliminate-fade 0.8s ease-in forwards;
+}
+.racer-token.eliminated img {
+  filter: grayscale(100%) brightness(0.5);
+}
+@keyframes eliminate-fade {
+  0% {
+    transform: translateX(-50%) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(-50%) scale(1.15) rotate(-15deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(-50%) scale(0) rotate(25deg);
+    opacity: 0;
+  }
+}
 
 .race-controls {
   display: flex;

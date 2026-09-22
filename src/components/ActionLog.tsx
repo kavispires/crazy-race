@@ -3,7 +3,7 @@ import { Card, Tag } from 'antd';
 import { useGameStore } from '../store/gameStore';
 import { CHARACTERS } from '../data/characters';
 import CharacterIcon from './CharacterIcon';
-import type { LogKind } from '../types';
+import type { LogEntry, LogKind } from '../types';
 
 const KIND_TAG: Record<LogKind, { color: string; label: string } | null> = {
   turn: { color: 'blue', label: 'Turn' },
@@ -28,8 +28,9 @@ function findEntryCharacterId(message: string): string | null {
   return match ? (NAME_TO_ID.get(match[0]) ?? null) : null;
 }
 
-export default function ActionLog() {
-  const actionLog = useGameStore((s) => s.actionLog);
+export default function ActionLog({ entries, title = 'Action Log' }: { entries?: LogEntry[]; title?: string }) {
+  const storeActionLog = useGameStore((s) => s.actionLog);
+  const actionLog = entries ?? storeActionLog;
   const topRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,7 +41,7 @@ export default function ActionLog() {
   const recentEntries = useMemo(() => [...actionLog.slice(-100)].reverse(), [actionLog]);
 
   return (
-    <Card size="small" title="Action Log" className="action-log">
+    <Card size="small" title={title} className="action-log">
       <div className="action-log-scroll">
         <div ref={topRef} />
         {recentEntries.map((entry) => {

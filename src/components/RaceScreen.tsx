@@ -114,11 +114,22 @@ export default function RaceScreen() {
           ))}
           {turnOrder.map((cid) => {
             const racer = racers[cid];
-            if (!racer || racer.finished) return null;
+            if (!racer) return null;
+            const eliminated = racer.finished && racer.finishOrder === -1;
+            const finishedRace = racer.finished && racer.finishOrder !== -1;
             const owner = players.find((p) => p.id === racer.ownerId);
             const character = getCharacter(cid);
             const leftPct = (racer.position + 0.5) * tileUnit;
             const lane = laneIndexById.get(cid) ?? 0;
+            const tokenClass = [
+              'racer-token',
+              racer.tripped && !eliminated ? 'tripped' : '',
+              cid === activeCharacterId ? 'active' : '',
+              finishedRace ? 'finished' : '',
+              eliminated ? 'eliminated' : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
             return (
               <Tooltip
                 key={cid}
@@ -133,11 +144,12 @@ export default function RaceScreen() {
                 mouseEnterDelay={0.15}
               >
                 <motion.div
-                  className={`racer-token${racer.tripped ? ' tripped' : ''}${cid === activeCharacterId ? ' active' : ''}`}
+                  className={tokenClass}
                   animate={{ left: `${leftPct}%`, top: laneTopOffset + lane * laneHeight }}
                   transition={{ type: 'spring', stiffness: 120, damping: 18 }}
                 >
                   <CharacterIcon characterId={cid} size={28} />
+                  {finishedRace && <span className="finish-sparkle">🎉</span>}
                 </motion.div>
               </Tooltip>
             );
