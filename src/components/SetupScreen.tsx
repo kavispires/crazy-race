@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Button, Form, InputNumber, Input, Typography, Card, Space, List, Tag, Tooltip } from 'antd';
+import { Button, Form, InputNumber, Input, Typography, Card, Space, List, Tag, Tooltip, Segmented } from 'antd';
 import { useGameStore } from '../store/gameStore';
-import { TRACKS } from '../data/tracks';
+import { buildTracks, DEFAULT_TRACK_LENGTH, TRACK_LENGTH_OPTIONS } from '../data/tracks';
 import { CHARACTERS } from '../data/characters';
 import CharacterIcon from './CharacterIcon';
 
@@ -13,6 +13,9 @@ export default function SetupScreen() {
   const startGame = useGameStore((s) => s.startGame);
   const [humanName, setHumanName] = useState('You');
   const [aiCount, setAiCount] = useState(3);
+  const [trackLength, setTrackLength] = useState<number>(DEFAULT_TRACK_LENGTH);
+
+  const previewTracks = buildTracks(trackLength);
 
   return (
     <div className="screen-center">
@@ -26,16 +29,26 @@ export default function SetupScreen() {
           <Form.Item label="Your name">
             <Input value={humanName} onChange={(e) => setHumanName(e.target.value)} maxLength={20} />
           </Form.Item>
-          <Form.Item label="Number of AI opponents" extra={`Up to ${MAX_AI_OPPONENTS} opponents (${MAX_AI_OPPONENTS + 1} players total).`}>
-            <InputNumber
-              min={1}
-              max={MAX_AI_OPPONENTS}
-              value={aiCount}
-              onChange={(v) => setAiCount(Math.min(MAX_AI_OPPONENTS, Math.max(1, v ?? 1)))}
-            />
-          </Form.Item>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <Form.Item label="Number of AI opponents" extra={`Up to ${MAX_AI_OPPONENTS} opponents (${MAX_AI_OPPONENTS + 1} players total).`}>
+              <InputNumber
+                min={1}
+                max={MAX_AI_OPPONENTS}
+                value={aiCount}
+                onChange={(v) => setAiCount(Math.min(MAX_AI_OPPONENTS, Math.max(1, v ?? 1)))}
+                style={{ width: '100%' }}
+              />
+            </Form.Item>
+            <Form.Item label="Track length" extra="How many spaces each race's track has.">
+              <Segmented
+                options={TRACK_LENGTH_OPTIONS.map((len) => ({ label: `${len}`, value: len }))}
+                value={trackLength}
+                onChange={(v) => setTrackLength(Number(v))}
+              />
+            </Form.Item>
+          </div>
           <Space direction="vertical" style={{ width: '100%' }}>
-            <Button type="primary" block size="large" onClick={() => startGame(humanName, aiCount)}>
+            <Button type="primary" block size="large" onClick={() => startGame(humanName, aiCount, trackLength)}>
               Start Game
             </Button>
           </Space>
@@ -46,7 +59,7 @@ export default function SetupScreen() {
         </Title>
         <List
           size="small"
-          dataSource={TRACKS}
+          dataSource={previewTracks}
           renderItem={(track, i) => (
             <List.Item>
               <Space>

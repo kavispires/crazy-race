@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuid } from 'uuid';
 import { getCharacter, makeCharacterPool, baseCharacterId } from '../data/characters';
-import { CHIP_VALUES, TRACKS } from '../data/tracks';
+import { CHIP_VALUES, DEFAULT_TRACK_LENGTH, buildTracks } from '../data/tracks';
 import { buildContext, createInitialRacers, type RaceRuntime, type RaceRuntimeCallbacks } from '../engine/raceEngine';
 import { isRaceOver, playTurn, useDiceReroll } from '../engine/turnResolver';
 import { aiDraftPick, aiSecretSelect } from '../ai/ai';
@@ -48,6 +48,7 @@ interface GameStore {
   // Race setup
   raceIndex: number;
   track: Track;
+  tracks: Track[]; // the 4 races for this game, generated at the chosen track length
   secretSelections: Record<string, string>; // playerId -> characterId, hidden until reveal
   secretSelectionOrderHint: string | null;
   firstPlayerId: string | null;
@@ -69,7 +70,7 @@ interface GameStore {
   _decisionResolver: ((value: string) => void) | null;
 
   // Actions
-  startGame: (humanName: string, aiCount: number) => void;
+  startGame: (humanName: string, aiCount: number, trackLength?: number) => void;
   draftPick: (characterId: string) => void;
   maybeAutoDraft: () => void;
   startSecretSelection: () => void;
@@ -158,7 +159,8 @@ export const useGameStore = create<GameStore>()(
   round2Pool: [],
 
   raceIndex: 0,
-  track: TRACKS[0],
+  track: buildTracks(DEFAULT_TRACK_LENGTH)[0],
+  tracks: buildTracks(DEFAULT_TRACK_LENGTH),
   secretSelections: {},
   secretSelectionOrderHint: null,
   firstPlayerId: null,
@@ -177,7 +179,8 @@ export const useGameStore = create<GameStore>()(
   _runtime: null,
   _decisionResolver: null,
 
-  startGame: (humanName, aiCount) => {
+  startGame: (humanName, aiCount, trackLength) => {
+    const tracks = buildTracks(trackLength ?? DEFAULT_TRACK_LENGTH);
     const players: Player[] = [
       { id: 'human', name: humanName || 'You', isHuman: true, characterIds: [], usedCharacterIds: [], score: 0, chips: [] },
       ...Array.from({ length: aiCount }, (_, i) => ({
@@ -211,7 +214,8 @@ export const useGameStore = create<GameStore>()(
       draftPickQueue: buildSnakeQueue(playerOrder, 0),
       draftRound: 0,
       raceIndex: 0,
-      track: TRACKS[0],
+      tracks,
+      track: tracks[0],
       actionLog: [makeEmptyLog(`The draft begins! ${draftPool.length} characters revealed.`)],
     });
 
@@ -505,14 +509,14 @@ export const useGameStore = create<GameStore>()(
   proceedToNextRace: () => {
     const state = get();
     const nextIndex = state.raceIndex + 1;
-    if (nextIndex >= TRACKS.length) {
+    if (nextIndex >= state.tracks.length) {
       const finalPlayers = [...state.players].sort((a, b) => b.score - a.score);
       set({ players: finalPlayers, phase: 'final' });
       return;
     }
     set({
       raceIndex: nextIndex,
-      track: TRACKS[nextIndex],
+      track: state.tracks[nextIndex],
       secretSelections: {},
       racers: {},
       turnOrder: [],
@@ -521,7 +525,7 @@ export const useGameStore = create<GameStore>()(
       starsCollected: {},
       _runtime: null,
       lastRaceResult: null,
-      actionLog: [...state.actionLog, makeEmptyLog(`Flipping the board to ${TRACKS[nextIndex].name}!`)],
+      actionLog: [...state.actionLog, makeEmptyLog(`Flipping the board to ${state.tracks[nextIndex].name}!`)],
     });
     get().startSecretSelection();
   },
@@ -536,7 +540,8 @@ export const useGameStore = create<GameStore>()(
       draftRound: 0,
       round2Pool: [],
       raceIndex: 0,
-      track: TRACKS[0],
+      track: buildTracks(DEFAULT_TRACK_LENGTH)[0],
+      tracks: buildTracks(DEFAULT_TRACK_LENGTH),
       secretSelections: {},
       firstPlayerId: null,
       racers: {},
