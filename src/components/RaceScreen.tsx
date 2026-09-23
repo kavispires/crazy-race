@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Button, Typography, Tag, Tooltip } from 'antd';
 import { useGameStore } from '../store/gameStore';
@@ -54,14 +55,19 @@ export default function RaceScreen() {
   const racers = useGameStore((s) => s.racers);
   const turnOrder = useGameStore((s) => s.turnOrder);
   const turnPointer = useGameStore((s) => s.turnPointer);
+  const priorityQueue = useGameStore((s) => s.priorityQueue);
   const players = useGameStore((s) => s.players);
   const advanceTurn = useGameStore((s) => s.advanceTurn);
   const useReroll = useGameStore((s) => s.useReroll);
   const isProcessingTurn = useGameStore((s) => s.isProcessingTurn);
   const raceIndex = useGameStore((s) => s.raceIndex);
   const pendingDecision = useGameStore((s) => s.pendingDecision);
+  const autoPlayEnabled = useGameStore((s) => s.autoPlayEnabled);
+  const toggleAutoPlay = useGameStore((s) => s.toggleAutoPlay);
 
-  const activeCharacterId = turnOrder[turnPointer % turnOrder.length];
+  // Priority turns (Skipper, Genius) jump the queue ahead of normal turn-order cycling, so the
+  // racer actually up next isn't always `turnOrder[turnPointer]` — match the engine's own logic.
+  const activeCharacterId = priorityQueue.length > 0 ? priorityQueue[0] : turnOrder[turnPointer % turnOrder.length];
   const activeRacer = racers[activeCharacterId];
   const activeOwner = players.find((p) => p.id === activeRacer?.ownerId);
   const diceCharacterId = Object.keys(racers).find((id) => getCharacter(id).id === 'dice');
@@ -69,6 +75,14 @@ export default function RaceScreen() {
   // AI opponents decide this for themselves internally (see engine/turnResolver.ts).
   const hasDice =
     !!diceCharacterId && !racers[diceCharacterId]?.finished && !!activeOwner?.isHuman;
+
+  // Auto-play: keep calling advanceTurn for AI turns on its own, pausing as soon as it's the
+  // human's own turn (or an unresolved decision needs their input) so they stay in control.
+  useEffect(() => {
+    if (!autoPlayEnabled || isProcessingTurn || pendingDecision) return;
+    if (activeOwner?.isHuman) return;
+    advanceTurn();
+  }, [autoPlayEnabled, isProcessingTurn, pendingDecision, activeOwner, advanceTurn]);
 
   // Each racer keeps a fixed lane (row) for the whole race, based on their
   // stable position in turnOrder, so they're always easy to track visually
@@ -171,6 +185,13 @@ export default function RaceScreen() {
           )}
         </div>
         <div className="control-buttons">
+          <Button
+            type={autoPlayEnabled ? 'primary' : 'default'}
+            onClick={() => toggleAutoPlay()}
+            title="Auto-play AI turns, pausing only for your turn"
+          >
+            {autoPlayEnabled ? '▶️ Auto-play on' : '⏸️ Auto-play off'}
+          </Button>
           {hasDice && activeCharacterId !== diceCharacterId && (
             <Button onClick={() => useReroll()} disabled={isProcessingTurn || !!pendingDecision}>
               Use Dice reroll
@@ -180,7 +201,7 @@ export default function RaceScreen() {
             type="primary"
             size="large"
             loading={isProcessingTurn}
-            disabled={!!pendingDecision}
+            disabled={!!pendingDecision || (autoPlayEnabled && !activeOwner?.isHuman)}
             onClick={() => advanceTurn()}
           >
             {activeOwner?.isHuman ? 'Roll Die' : `Next → (${activeOwner?.name})`}

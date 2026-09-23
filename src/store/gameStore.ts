@@ -18,6 +18,8 @@ import type {
 
 /** How long to wait after the 2nd racer finishes, so its move/celebration animation can play before cutting to results. */
 const FINISH_ANIMATION_DELAY_MS = 900;
+/** Minimum pause between auto-played turns when narration is off, so movement animations stay watchable. */
+const AUTO_PLAY_TURN_DELAY_MS = 500;
 
 /** Converts a 0-based index into a spreadsheet-style letter label: 0->A, 25->Z, 26->AA, 27->AB, ... */
 function botLetter(index: number): string {
@@ -66,6 +68,7 @@ interface GameStore {
   lastRaceResult: { first: string; second: string; raceIndex: number } | null;
   winnerBaseIdHistory: string[]; // base character ids that have won a race this game (for Twins)
   narrationEnabled: boolean; // user preference: speak the action log aloud via speech synthesis
+  autoPlayEnabled: boolean; // user preference: auto-advance AI turns, pausing only for the human's own turn/decisions
 
   // internal (not for UI)
   _runtime: RaceRuntime | null;
@@ -85,6 +88,7 @@ interface GameStore {
   proceedToNextRace: () => void;
   restart: () => void;
   toggleNarration: () => void;
+  toggleAutoPlay: () => void;
 }
 
 function shuffled<T>(arr: T[]): T[] {
@@ -191,6 +195,7 @@ export const useGameStore = create<GameStore>()(
   lastRaceResult: null,
   winnerBaseIdHistory: [],
   narrationEnabled: false,
+  autoPlayEnabled: false,
 
   _runtime: null,
   _decisionResolver: null,
@@ -392,6 +397,8 @@ export const useGameStore = create<GameStore>()(
       set({ racers: { ...runtime.racers } });
       if (get().narrationEnabled) {
         await narrationChain;
+      } else if (get().autoPlayEnabled) {
+        await new Promise((resolve) => setTimeout(resolve, AUTO_PLAY_TURN_DELAY_MS));
       }
       if (isRaceOver(runtime)) {
         // Let the finishing racer's move/celebration animation play before cutting to results.
@@ -424,6 +431,8 @@ export const useGameStore = create<GameStore>()(
     set({ racers: { ...runtime.racers } });
     if (get().narrationEnabled) {
       await narrationChain;
+    } else if (get().autoPlayEnabled) {
+      await new Promise((resolve) => setTimeout(resolve, AUTO_PLAY_TURN_DELAY_MS));
     }
 
     if (isRaceOver(runtime)) {
@@ -588,6 +597,8 @@ export const useGameStore = create<GameStore>()(
       if (!next) cancelSpeech();
       return { narrationEnabled: next };
     }),
+
+  toggleAutoPlay: () => set((s) => ({ autoPlayEnabled: !s.autoPlayEnabled })),
     }),
     {
       name: 'magical-athlete-save',
