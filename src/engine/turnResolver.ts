@@ -157,7 +157,19 @@ export async function playTurn(
     const reasonSuffix = adjustmentReason ? ` because of ${adjustmentReason}` : '';
     const rollDetail =
       roll !== null && roll !== moveValue ? ` (rolled ${roll}, adjusted to ${moveValue}${reasonSuffix})` : '';
-    ctx.log(`${ctx.describe(characterId)} moves ${moveValue} space${moveValue === 1 ? '' : 's'}${rollDetail}.`, 'move');
+    const plainName = getCharacter(characterId).name;
+    const spaceWord = (n: number) => `space${n === 1 ? '' : 's'}`;
+    const narration =
+      roll === null
+        ? `${plainName} moves ${moveValue} ${spaceWord(moveValue)}.`
+        : roll === moveValue
+          ? `${plainName} rolled ${roll} and moved ${moveValue} ${spaceWord(moveValue)}.`
+          : `${plainName} rolled ${roll} but moved ${moveValue} ${spaceWord(moveValue)}${reasonSuffix}.`;
+    ctx.log(
+      `${ctx.describe(characterId)} moves ${moveValue} space${moveValue === 1 ? '' : 's'}${rollDetail}.`,
+      'move',
+      narration,
+    );
     await ctx.move(characterId, moveValue);
   }
 

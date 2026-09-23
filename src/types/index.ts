@@ -61,6 +61,8 @@ export interface LogEntry {
   message: string;
   timestamp: number;
   kind: LogKind;
+  /** Optional alternate phrasing used only for spoken narration; falls back to `message` if unset. */
+  narration?: string;
 }
 
 /** Live state of a single racer within the current race. */
@@ -91,7 +93,7 @@ export interface AbilityContext {
   /** `sourceCharacterId` (usually the ability's own `self`) is recorded for log attribution when the roll is later adjusted. */
   addRollModifier: (characterId: string, amount: number, sourceCharacterId?: string) => void;
   setFlatMoveOverride: (characterId: string, value: number) => void;
-  log: (message: string, kind?: LogKind) => void;
+  log: (message: string, kind?: LogKind, narration?: string) => void;
   /** Human-readable "Character Name (Owner)" label for use in log messages. */
   describe: (characterId: string) => string;
   /** Ask the owning player (human=modal, AI=heuristic) to choose an option. */

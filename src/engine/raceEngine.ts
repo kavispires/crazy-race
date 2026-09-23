@@ -107,8 +107,8 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
     return owner ? `${name} (${owner.name})` : name;
   };
 
-  const log = (message: string, kind: LogKind = 'ability') => {
-    runtime.callbacks.onLog({ id: uuid(), message, timestamp: Date.now(), kind });
+  const log = (message: string, kind: LogKind = 'ability', narration?: string) => {
+    runtime.callbacks.onLog({ id: uuid(), message, timestamp: Date.now(), kind, narration });
   };
 
   const notifyAbilityResolve = (triggerId: string) => {

@@ -6,6 +6,7 @@ import { CHIP_VALUES, DEFAULT_TRACK_LENGTH, buildTracks } from '../data/tracks';
 import { buildContext, createInitialRacers, type RaceRuntime, type RaceRuntimeCallbacks } from '../engine/raceEngine';
 import { isRaceOver, playTurn, useDiceReroll } from '../engine/turnResolver';
 import { aiDraftPick, aiSecretSelect } from '../ai/ai';
+import { speakAndWait, toSpeechText, cancelSpeech } from '../narration/narrator';
 import type {
   Decision,
   GamePhase,
@@ -64,6 +65,7 @@ interface GameStore {
   isProcessingTurn: boolean;
   lastRaceResult: { first: string; second: string; raceIndex: number } | null;
   winnerBaseIdHistory: string[]; // base character ids that have won a race this game (for Twins)
+  narrationEnabled: boolean; // user preference: speak the action log aloud via speech synthesis
 
   // internal (not for UI)
   _runtime: RaceRuntime | null;
@@ -82,6 +84,7 @@ interface GameStore {
   finishRace: () => void;
   proceedToNextRace: () => void;
   restart: () => void;
+  toggleNarration: () => void;
 }
 
 function shuffled<T>(arr: T[]): T[] {
@@ -103,6 +106,11 @@ function makeEmptyLog(message: string): LogEntry {
   return { id: uuid(), message, timestamp: Date.now(), kind: 'system' };
 }
 
+/** Tracks the most recently queued narration utterance, so turn advancement can wait for it to
+ *  finish (the browser's own speech queue is strictly FIFO, so awaiting only the latest one is
+ *  enough to know every earlier narration line from this turn has also finished). */
+let narrationChain: Promise<void> = Promise.resolve();
+
 /**
  * Builds the live (non-serializable) callback set for a RaceRuntime. Extracted so it can be
  * rebuilt both when a race first begins and when a persisted game is rehydrated from
@@ -113,7 +121,14 @@ function createRuntimeCallbacks(
   get: () => GameStore,
 ): RaceRuntimeCallbacks {
   return {
-    onLog: (entry) => set((s) => ({ actionLog: [...s.actionLog, entry] })),
+    onLog: (entry) => {
+      set((s) => ({ actionLog: [...s.actionLog, entry] }));
+      // Only live race-turn messages reach this callback (draft/setup logs are appended
+      // directly via `set()` elsewhere), so this naturally narrates the race only.
+      if (get().narrationEnabled) {
+        narrationChain = speakAndWait(toSpeechText(entry));
+      }
+    },
     onRacersChange: (racers) => set({ racers: { ...racers } }),
     onStarCollected: (characterId) => {
       const ownerId = get().racers[characterId]?.ownerId;
@@ -175,6 +190,7 @@ export const useGameStore = create<GameStore>()(
   isProcessingTurn: false,
   lastRaceResult: null,
   winnerBaseIdHistory: [],
+  narrationEnabled: false,
 
   _runtime: null,
   _decisionResolver: null,
@@ -374,6 +390,9 @@ export const useGameStore = create<GameStore>()(
       const ctx = buildContext(runtime);
       await playTurn(runtime, ctx, characterId);
       set({ racers: { ...runtime.racers } });
+      if (get().narrationEnabled) {
+        await narrationChain;
+      }
       if (isRaceOver(runtime)) {
         // Let the finishing racer's move/celebration animation play before cutting to results.
         await new Promise((resolve) => setTimeout(resolve, FINISH_ANIMATION_DELAY_MS));
@@ -403,6 +422,9 @@ export const useGameStore = create<GameStore>()(
     const ctx = buildContext(runtime);
     await playTurn(runtime, ctx, characterId);
     set({ racers: { ...runtime.racers } });
+    if (get().narrationEnabled) {
+      await narrationChain;
+    }
 
     if (isRaceOver(runtime)) {
       // Let the finishing racer's move/celebration animation play before cutting to results.
@@ -559,6 +581,13 @@ export const useGameStore = create<GameStore>()(
       _decisionResolver: null,
     });
   },
+
+  toggleNarration: () =>
+    set((s) => {
+      const next = !s.narrationEnabled;
+      if (!next) cancelSpeech();
+      return { narrationEnabled: next };
+    }),
     }),
     {
       name: 'magical-athlete-save',
