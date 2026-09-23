@@ -48,6 +48,12 @@ if (isNarrationSupported()) {
   };
 }
 
+/** Queued speakAndWait resolvers not yet fired; cancelSpeech force-resolves them directly since
+ *  `speechSynthesis.cancel()` doesn't reliably fire `onend`/`onerror` in every browser — without
+ *  this, turning narration off mid-utterance could leave an `await speakAndWait(...)` hanging
+ *  forever and freeze the game. */
+let pendingResolvers: (() => void)[] = [];
+
 /** Queues a line to be spoken and resolves once it has fully finished (or immediately if
  *  narration isn't supported / text is empty), so callers can pace the game to match speech. */
 export function speakAndWait(text: string): Promise<void> {
@@ -61,15 +67,24 @@ export function speakAndWait(text: string): Promise<void> {
     }
     utterance.rate = 1.05;
     utterance.pitch = 1;
-    utterance.onend = () => resolve();
-    utterance.onerror = () => resolve();
+    const finish = () => {
+      pendingResolvers = pendingResolvers.filter((r) => r !== finish);
+      resolve();
+    };
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    pendingResolvers.push(finish);
     window.speechSynthesis.speak(utterance);
   });
 }
 
-/** Stops any speech in progress and clears the pending queue. */
+/** Stops any speech in progress, clears the pending queue, and unblocks any code awaiting
+ *  `speakAndWait` for an utterance that was cancelled before it could fire its own event. */
 export function cancelSpeech(): void {
   if (isNarrationSupported()) window.speechSynthesis.cancel();
+  const resolvers = pendingResolvers;
+  pendingResolvers = [];
+  resolvers.forEach((resolve) => resolve());
 }
 
 // Log messages embed a racer's owner as "Name (Owner)" (see `describe()` in raceEngine.ts).
