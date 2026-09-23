@@ -65,7 +65,10 @@ export default function RaceScreen() {
   const activeRacer = racers[activeCharacterId];
   const activeOwner = players.find((p) => p.id === activeRacer?.ownerId);
   const diceCharacterId = Object.keys(racers).find((id) => getCharacter(id).id === 'dice');
-  const hasDice = !!diceCharacterId && !racers[diceCharacterId]?.finished;
+  // Only the human may manually choose to burn Dice's reroll, and only during their own turn;
+  // AI opponents decide this for themselves internally (see engine/turnResolver.ts).
+  const hasDice =
+    !!diceCharacterId && !racers[diceCharacterId]?.finished && !!activeOwner?.isHuman;
 
   // Each racer keeps a fixed lane (row) for the whole race, based on their
   // stable position in turnOrder, so they're always easy to track visually

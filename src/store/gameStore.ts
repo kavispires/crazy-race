@@ -322,6 +322,7 @@ export const useGameStore = create<GameStore>()(
       finishedCharacterIds: [],
       eliminatedCharacterIds: [],
       rerollUsedThisTurn: false,
+      pendingRerollValue: null,
       custom: {},
       previousWinnerBaseIds: [...state.winnerBaseIdHistory],
       pendingMoveCancelled: false,

@@ -20,7 +20,8 @@ function notifyAbilityResolve(runtime: RaceRuntime, ctx: AbilityContext, trigger
   }
 }
 
-/** Grants a reroll of the active racer's die to another racer's owner; moves Dice +1. */
+/** Grants a reroll of the active racer's die to another racer's owner; moves Dice +1. The new
+ *  roll is stashed on the runtime so the upcoming turn's roll step uses it instead of rolling fresh. */
 export async function useDiceReroll(
   runtime: RaceRuntime,
   ctx: AbilityContext,
@@ -28,6 +29,7 @@ export async function useDiceReroll(
 ): Promise<number> {
   runtime.rerollUsedThisTurn = true;
   const newRoll = rollDie();
+  runtime.pendingRerollValue = newRoll;
   ctx.log(`${ctx.describe(requesterCharacterId)} uses Dice's reroll: ${newRoll}!`, 'ability');
   const diceId = Object.keys(runtime.racers).find(
     (id) => getCharacter(id).id === 'dice',
@@ -39,6 +41,10 @@ export async function useDiceReroll(
   return newRoll;
 }
 
+/** Chance an AI-owned racer reactively burns Dice's reroll after seeing an unlucky natural roll. */
+const AI_REROLL_LOW_ROLL_THRESHOLD = 2;
+const AI_REROLL_CHANCE = 0.6;
+
 /** Resolves one full turn for `characterId`, awaiting any human decisions along the way. */
 export async function playTurn(
   runtime: RaceRuntime,
@@ -48,6 +54,10 @@ export async function playTurn(
   const racer = runtime.racers[characterId];
   runtime.rerollUsedThisTurn = false;
   runtime.pendingMoveCancelled = false;
+  // Consume any pre-committed reroll now, so it can never leak into a later, unrelated turn
+  // (e.g. if this racer turns out to be tripped and never reaches the roll step below).
+  const preCommittedReroll = runtime.pendingRerollValue;
+  runtime.pendingRerollValue = null;
 
   ctx.log(`${ctx.describe(characterId)}'s turn (space ${racer.position}/${ctx.trackLength})`, 'turn');
 
@@ -90,7 +100,29 @@ export async function playTurn(
         await effectiveCharacter(runtime, other.characterId).abilities.onBeforeAnyRoll?.(ctx, other.characterId, characterId);
       }
     }
-    roll = rollDie();
+    if (preCommittedReroll !== null) {
+      // A reroll was pre-committed before this turn started (human via the UI button).
+      roll = preCommittedReroll;
+    } else {
+      roll = rollDie();
+      // AI-owned racers decide this for themselves: on an unlucky roll, they may reactively
+      // burn Dice's once-per-turn reroll rather than a human choosing on their behalf.
+      const owner = runtime.players[racer.ownerId];
+      const diceId = Object.keys(runtime.racers).find((id) => getCharacter(id).id === 'dice');
+      if (
+        owner &&
+        !owner.isHuman &&
+        diceId &&
+        diceId !== characterId &&
+        !runtime.racers[diceId].finished &&
+        !runtime.rerollUsedThisTurn &&
+        roll <= AI_REROLL_LOW_ROLL_THRESHOLD &&
+        Math.random() < AI_REROLL_CHANCE
+      ) {
+        roll = await useDiceReroll(runtime, ctx, characterId);
+        runtime.pendingRerollValue = null; // consumed immediately, not left for a future turn
+      }
+    }
     const modifier = racer.rollModifier;
     const modifierSourceIds = racer.rollModifierSources;
     racer.rollModifier = 0;

@@ -29,6 +29,9 @@ export interface RaceRuntime {
   finishedCharacterIds: string[];
   eliminatedCharacterIds: string[];
   rerollUsedThisTurn: boolean;
+  /** Set when a reroll is pre-committed before the roll happens (human via UI button, or an
+   *  AI's own autonomous decision); consumed by the next roll instead of rolling fresh. */
+  pendingRerollValue: number | null;
   /** Free-form per-character scratch space that persists for the whole race. */
   custom: Record<string, Record<string, unknown>>;
   /** Base character ids that won a previous race this game (for Twins). */
