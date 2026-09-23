@@ -18,9 +18,15 @@ export default function DecisionModal() {
       footer={null}
     >
       <p>{pendingDecision.message}</p>
-      <Space>
+      <Space direction="vertical" style={{ width: '100%' }}>
         {pendingDecision.options.map((opt) => (
-          <Button key={opt.value} type="primary" onClick={() => resolveDecision(opt.value)}>
+          <Button
+            key={opt.value}
+            type="primary"
+            block
+            style={{ height: 'auto', whiteSpace: 'normal', textAlign: 'left', padding: '8px 12px' }}
+            onClick={() => resolveDecision(opt.value)}
+          >
             {opt.label}
           </Button>
         ))}

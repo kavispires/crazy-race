@@ -260,11 +260,11 @@ export const CHARACTERS: Character[] = [
         const choice = await ctx.decide(
           self,
           'Egg hatches! Pick a power to be born with:',
-          drawn.map((c) => ({ label: c.name, value: c.id })),
+          drawn.map((c) => ({ label: `${c.name} — ${c.description}`, value: c.id })),
         );
         const picked = drawn.find((c) => c.id === choice) ?? drawn[0];
         ctx.custom[self] = { ...ctx.custom[self], borrowedBaseId: picked.id };
-        ctx.log(`${ctx.describe(self)} hatches with the power of ${picked.name}!`);
+        ctx.log(`${ctx.describe(self)} hatches with the power of ${picked.name}: ${picked.description}`);
       },
     },
   },
