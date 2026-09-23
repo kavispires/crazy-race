@@ -48,6 +48,7 @@ export function createInitialRacers(characterIdToOwner: Record<string, string>):
       finished: false,
       finishOrder: null,
       rollModifier: 0,
+      rollModifierSources: [],
       skipNextRoll: false,
       spacesMovedLastTurn: 0,
       flatMoveOverride: null,
@@ -123,7 +124,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       mmRacer.finished = true;
       mmRacer.finishOrder = runtime.finishOrderCounter++;
       runtime.finishedCharacterIds.push(mmId);
-      log(`♟️ ${describe(mmId)} correctly predicted the winner and claims 2nd place, ending the race!`, 'finish');
+      log(`${describe(mmId)} correctly predicted the winner and claims 2nd place, ending the race!`, 'finish');
     }
   };
 
@@ -136,7 +137,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       runtime.callbacks.onStarCollected(seerId);
       runtime.callbacks.onStarCollected(seerId);
       runtime.callbacks.onStarCollected(seerId);
-      log(`🔮 ${describe(seerId)} correctly predicted ${describe(last.characterId)} would finish last and earns 3 bonus chips!`, 'ability');
+      log(`${describe(seerId)} correctly predicted ${describe(last.characterId)} would finish last and earns 3 bonus chips!`, 'ability');
     }
   };
 
@@ -148,7 +149,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
     // racer back and forth forever (arrow pushes onto the redirect target, which pushes right back
     // onto the arrow). If we recurse too deep, stop chaining and just settle in place.
     if (depth > 25) {
-      log(`⚠️ ${describe(characterId)} gets stuck bouncing between hazards and stays put!`, 'hazard');
+      log(`${describe(characterId)} gets stuck bouncing between hazards and stays put!`, 'hazard');
       return;
     }
     const from = racer.position;
@@ -167,7 +168,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
         (r) => r.characterId !== characterId && !r.finished && effectiveCharacter(runtime, r.characterId).abilities.blocksOvershoot,
       );
       if (sticklerBlocking) {
-        log(`🤓 ${describe(characterId)} overshoots the finish and doesn't move (must land exactly)!`, 'hazard');
+        log(`${describe(characterId)} overshoots the finish and doesn't move (must land exactly)!`, 'hazard');
         return;
       }
     }
@@ -253,7 +254,7 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
       racer.finishOrder = runtime.finishOrderCounter++;
       runtime.finishedCharacterIds.push(characterId);
       const place = racer.finishOrder === 0 ? '1st 🥇' : racer.finishOrder === 1 ? '2nd 🥈' : `#${racer.finishOrder + 1}`;
-      log(`🏁 ${describe(characterId)} crosses the finish line in ${place} place!`, 'finish');
+      log(`${describe(characterId)} crosses the finish line in ${place} place!`, 'finish');
       runtime.callbacks.onRacersChange({ ...runtime.racers });
       if (racer.finishOrder === 0) checkMastermindPrediction(characterId);
       if (runtime.finishedCharacterIds.length === 2) checkSeerPrediction();
@@ -264,14 +265,14 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
     const space = runtime.track.spaces[racer.position];
     if (space?.effect) {
       if (space.effect.type === 'rock') {
-        log(`🪨 ${describe(characterId)} lands on a rock and trips!`, 'hazard');
+        log(`${describe(characterId)} lands on a rock and trips!`, 'hazard');
         racer.tripped = true;
       } else if (space.effect.type === 'star') {
-        log(`⭐ ${describe(characterId)} grabs a star chip (+1 bonus point at game end)!`, 'hazard');
+        log(`${describe(characterId)} grabs a star chip (+1 bonus point at game end)!`, 'hazard');
         runtime.callbacks.onStarCollected(characterId);
       } else if (space.effect.type === 'arrow') {
         const direction = space.effect.delta > 0 ? 'forward' : 'backward';
-        log(`↔️ ${describe(characterId)} is caught by an arrow and pushed ${direction}!`, 'hazard');
+        log(`${describe(characterId)} is caught by an arrow and pushed ${direction}!`, 'hazard');
         await move(characterId, space.effect.delta, { silent: opts?.silent, depth: depth + 1 });
         return;
       }
@@ -334,10 +335,13 @@ export function buildContext(runtime: RaceRuntime): AbilityContext {
     },
     getRacer: (characterId) => runtime.racers[characterId],
     getAllRacers: () => Object.values(runtime.racers),
-    addRollModifier: (characterId, amount) => {
+    addRollModifier: (characterId, amount, sourceCharacterId) => {
       const racer = runtime.racers[characterId];
       if (!racer) return;
       racer.rollModifier += amount;
+      if (sourceCharacterId && !racer.rollModifierSources.includes(sourceCharacterId)) {
+        racer.rollModifierSources.push(sourceCharacterId);
+      }
     },
     setFlatMoveOverride: (characterId, value) => {
       const racer = runtime.racers[characterId];

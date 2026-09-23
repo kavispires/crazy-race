@@ -570,10 +570,18 @@ export const useGameStore = create<GameStore>()(
       // the live store, and clear transient async flags so the player can simply continue.
       onRehydrateStorage: () => (state) => {
         if (!state) return;
+        // Backfill fields added after this save was written, so older saves don't crash on load.
+        const racers = Object.fromEntries(
+          Object.entries(state.racers).map(([id, racer]) => [
+            id,
+            { ...racer, rollModifierSources: racer.rollModifierSources ?? [] },
+          ]),
+        );
         useGameStore.setState({
           isProcessingTurn: false,
           pendingDecision: null,
           _decisionResolver: null,
+          racers,
           _runtime: state._runtime
             ? { ...state._runtime, callbacks: createRuntimeCallbacks(useGameStore.setState, useGameStore.getState) }
             : null,

@@ -20,7 +20,7 @@ export const CHARACTERS: Character[] = [
           { label: 'No, keep roll', value: 'no' },
         ]);
         if (choice === 'yes') {
-          ctx.log(`⚗️ ${ctx.describe(self)} transmutes the roll into a move of 4!`);
+          ctx.log(`${ctx.describe(self)} transmutes the roll into a move of 4!`);
           return 4;
         }
         return roll;
@@ -35,7 +35,7 @@ export const CHARACTERS: Character[] = [
     abilities: {
       onPassedBy: (ctx, self, other) => {
         ctx.setTripped(other, true);
-        ctx.log(`🍌 ${ctx.describe(other)} slips on ${ctx.describe(self)}'s peel and trips!`);
+        ctx.log(`${ctx.describe(other)} slips on ${ctx.describe(self)}'s peel and trips!`);
       },
     },
   },
@@ -46,7 +46,7 @@ export const CHARACTERS: Character[] = [
     tier: 2,
     abilities: {
       onPass: async (ctx, self, other) => {
-        ctx.log(`🐎 ${ctx.describe(self)} charges past, knocking ${ctx.describe(other)} back 2 spaces!`);
+        ctx.log(`${ctx.describe(self)} charges past, knocking ${ctx.describe(other)} back 2 spaces!`);
         await ctx.move(other, -2);
       },
     },
@@ -70,7 +70,7 @@ export const CHARACTERS: Character[] = [
         const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
         if (others.length === 0) return;
         const last = others.reduce((a, b) => (a.position <= b.position ? a : b));
-        ctx.addRollModifier(last.characterId, 2);
+        ctx.addRollModifier(last.characterId, 2, self);
         ctx.setFlatMoveOverride(self, 1);
         ctx.log(
           `📣 ${ctx.describe(self)} rallies ${ctx.describe(last.characterId)} (+2 next roll) but only moves 1 herself!`,
@@ -90,8 +90,8 @@ export const CHARACTERS: Character[] = [
         const active = ctx.getRacer(activeCharacterId);
         if (coach.finished || active.finished) return;
         if (coach.position === active.position) {
-          ctx.addRollModifier(activeCharacterId, 1);
-          ctx.log(`📋 ${ctx.describe(self)} coaches ${ctx.describe(activeCharacterId)} up: +1 to the roll!`);
+          ctx.addRollModifier(activeCharacterId, 1, self);
+          ctx.log(`${ctx.describe(self)} coaches ${ctx.describe(activeCharacterId)} up: +1 to the roll!`);
         }
       },
     },
@@ -120,14 +120,14 @@ export const CHARACTERS: Character[] = [
         if (choice !== 'yes') return;
         const selfRoll = 1 + Math.floor(Math.random() * 6);
         const otherRoll = 1 + Math.floor(Math.random() * 6);
-        ctx.log(`⚔️ Duel! ${ctx.describe(self)} rolls ${selfRoll}, ${ctx.describe(other)} rolls ${otherRoll}.`);
+        ctx.log(`Duel! ${ctx.describe(self)} rolls ${selfRoll}, ${ctx.describe(other)} rolls ${otherRoll}.`);
         if (selfRoll === otherRoll) {
           ctx.log('⚔️ The duel ends in a tie. No one trips.');
           return;
         }
         const loser = selfRoll > otherRoll ? other : self;
         ctx.setTripped(loser, true);
-        ctx.log(`⚔️ ${ctx.describe(loser)} loses the duel and trips!`);
+        ctx.log(`${ctx.describe(loser)} loses the duel and trips!`);
       },
     },
   },
@@ -141,7 +141,7 @@ export const CHARACTERS: Character[] = [
         if (activeCharacterId === self) return;
         const slime = ctx.getRacer(self);
         if (slime.finished) return;
-        ctx.addRollModifier(activeCharacterId, -1);
+        ctx.addRollModifier(activeCharacterId, -1, self);
       },
     },
   },
@@ -153,7 +153,7 @@ export const CHARACTERS: Character[] = [
     abilities: {
       onOtherTurnEnd: (ctx, self, other, spacesMoved) => {
         if (spacesMoved > 1) return;
-        ctx.log(`😝 ${ctx.describe(self)} jeers at ${ctx.describe(other)}'s puny move and hops ahead 2 spaces!`);
+        ctx.log(`${ctx.describe(self)} jeers at ${ctx.describe(other)}'s puny move and hops ahead 2 spaces!`);
         void ctx.move(self, 2);
       },
     },
@@ -170,7 +170,7 @@ export const CHARACTERS: Character[] = [
           .getAllRacers()
           .filter((r) => r.characterId !== self && !r.finished && r.position === mouth.position && !isImmuneRacer(r.characterId));
         if (sharing.length === 1) {
-          ctx.log(`👄 ${ctx.describe(self)} devours ${ctx.describe(sharing[0].characterId)}!`);
+          ctx.log(`${ctx.describe(self)} devours ${ctx.describe(sharing[0].characterId)}!`);
           ctx.eliminate(sharing[0].characterId);
         }
       },
@@ -183,12 +183,12 @@ export const CHARACTERS: Character[] = [
     tier: 1,
     abilities: {
       onRoll: (ctx, self, roll) => {
-        ctx.log(`🚀 ${ctx.describe(self)} doubles the roll for a huge launch!`);
+        ctx.log(`${ctx.describe(self)} doubles the roll for a huge launch!`);
         return roll * 2;
       },
       onTurnEnd: (ctx, self) => {
         ctx.setTripped(self, true);
-        ctx.log(`🚀 ${ctx.describe(self)} trips after the launch!`);
+        ctx.log(`${ctx.describe(self)} trips after the launch!`);
       },
     },
   },
@@ -201,7 +201,7 @@ export const CHARACTERS: Character[] = [
       onAbilityResolve: (ctx, trigger, self) => {
         if (trigger === self) return;
         void ctx.move(self, 1, { silent: true });
-        ctx.log(`🐾 ${ctx.describe(self)} scoots forward 1 space!`);
+        ctx.log(`${ctx.describe(self)} scoots forward 1 space!`);
       },
     },
   },
@@ -213,7 +213,7 @@ export const CHARACTERS: Character[] = [
     abilities: {
       onShareSpace: (ctx, self, other) => {
         ctx.setTripped(other, true);
-        ctx.log(`🧙‍♀️ ${ctx.describe(other)} stumbles into ${ctx.describe(self)}'s hut and trips!`);
+        ctx.log(`${ctx.describe(other)} stumbles into ${ctx.describe(self)}'s hut and trips!`);
       },
     },
   },
@@ -227,11 +227,11 @@ export const CHARACTERS: Character[] = [
         const halfway = ctx.trackLength / 2;
         const position = ctx.getRacer(self).position;
         if (position < halfway) {
-          ctx.addRollModifier(self, 3);
-          ctx.log(`🎈 ${ctx.describe(self)} floats ahead of the halfway point: +3 to the roll!`);
+          ctx.addRollModifier(self, 3, self);
+          ctx.log(`${ctx.describe(self)} floats ahead of the halfway point: +3 to the roll!`);
         } else {
-          ctx.addRollModifier(self, -1);
-          ctx.log(`🎈 ${ctx.describe(self)} is past the halfway point and deflates a little: -1 to the roll.`);
+          ctx.addRollModifier(self, -1, self);
+          ctx.log(`${ctx.describe(self)} is past the halfway point and deflates a little: -1 to the roll.`);
         }
       },
     },
@@ -264,7 +264,7 @@ export const CHARACTERS: Character[] = [
         );
         const picked = drawn.find((c) => c.id === choice) ?? drawn[0];
         ctx.custom[self] = { ...ctx.custom[self], borrowedBaseId: picked.id };
-        ctx.log(`🥚 ${ctx.describe(self)} hatches with the power of ${picked.name}!`);
+        ctx.log(`${ctx.describe(self)} hatches with the power of ${picked.name}!`);
       },
     },
   },
@@ -292,7 +292,7 @@ export const CHARACTERS: Character[] = [
         const targetPos = target.position;
         await ctx.setPosition(self, targetPos);
         await ctx.setPosition(target.characterId, selfPos);
-        ctx.log(`🩴 ${ctx.describe(self)} flip-flops spaces with ${ctx.describe(target.characterId)}!`);
+        ctx.log(`${ctx.describe(self)} flip-flops spaces with ${ctx.describe(target.characterId)}!`);
         ctx.setFlatMoveOverride(self, 0);
       },
     },
@@ -315,7 +315,7 @@ export const CHARACTERS: Character[] = [
         const prediction = ctx.custom[self]?.geniusPrediction;
         if (typeof prediction === 'number' && prediction === roll) {
           ctx.custom[self] = { ...ctx.custom[self], geniusExtraTurn: true };
-          ctx.log(`🧠 ${ctx.describe(self)} predicted ${prediction} correctly! Another turn is coming.`);
+          ctx.log(`${ctx.describe(self)} predicted ${prediction} correctly! Another turn is coming.`);
         }
         return roll;
       },
@@ -331,11 +331,11 @@ export const CHARACTERS: Character[] = [
         if (isAloneInLead(ctx, self)) {
           ctx.grantBronzeChip(self);
           ctx.setFlatMoveOverride(self, 0);
-          ctx.log(`🐇 ${ctx.describe(self)} is alone in the lead and takes a victory lap chip instead of moving!`);
+          ctx.log(`${ctx.describe(self)} is alone in the lead and takes a victory lap chip instead of moving!`);
           return;
         }
-        ctx.addRollModifier(self, 2);
-        ctx.log(`🐇 ${ctx.describe(self)} bounds ahead: +2 to the roll!`);
+        ctx.addRollModifier(self, 2, self);
+        ctx.log(`${ctx.describe(self)} bounds ahead: +2 to the roll!`);
       },
     },
   },
@@ -350,7 +350,7 @@ export const CHARACTERS: Character[] = [
         if (proposedPosition === 0) return undefined;
         const babyPos = ctx.getRacer(self).position;
         if (!ctx.getRacer(self).finished && proposedPosition === babyPos) {
-          ctx.log(`👶 ${ctx.describe(self)} won't share the space! ${ctx.describe(mover)} lands just behind instead.`);
+          ctx.log(`${ctx.describe(self)} won't share the space! ${ctx.describe(mover)} lands just behind instead.`);
           return Math.max(0, babyPos - 1);
         }
         return undefined;
@@ -359,7 +359,7 @@ export const CHARACTERS: Character[] = [
       onShareSpace: async (ctx, self, other) => {
         const otherRacer = ctx.getRacer(other);
         if (otherRacer.finished || otherRacer.position === 0) return;
-        ctx.log(`👶 ${ctx.describe(self)} won't share the space! ${ctx.describe(other)} is bumped back a step.`);
+        ctx.log(`${ctx.describe(self)} won't share the space! ${ctx.describe(other)} is bumped back a step.`);
         await ctx.setPosition(other, otherRacer.position - 1);
       },
     },
@@ -385,7 +385,7 @@ export const CHARACTERS: Character[] = [
         );
         const target = others.find((r) => r.characterId === targetId) ?? others[0];
         await ctx.setPosition(target.characterId, ctx.getRacer(self).position);
-        ctx.log(`🌀 ${ctx.describe(self)} hypnotizes ${ctx.describe(target.characterId)} into warping over!`);
+        ctx.log(`${ctx.describe(self)} hypnotizes ${ctx.describe(target.characterId)} into warping over!`);
       },
     },
   },
@@ -399,7 +399,7 @@ export const CHARACTERS: Character[] = [
         if (roller === self || roll !== 1) return;
         ctx.cancelPendingMove();
         void ctx.move(self, 1);
-        ctx.log(`🐛 ${ctx.describe(roller)} rolled a 1! ${ctx.describe(self)} cancels it and inches forward.`);
+        ctx.log(`${ctx.describe(roller)} rolled a 1! ${ctx.describe(self)} cancels it and inches forward.`);
       },
     },
   },
@@ -411,7 +411,7 @@ export const CHARACTERS: Character[] = [
     abilities: {
       onAnyRoll: async (ctx, self, roller, roll) => {
         if (roller === self || roll !== 6) return;
-        ctx.log(`🙇 ${ctx.describe(roller)} rolled a 6! ${ctx.describe(self)} scurries ahead 2 first.`);
+        ctx.log(`${ctx.describe(roller)} rolled a 6! ${ctx.describe(self)} scurries ahead 2 first.`);
         await ctx.move(self, 2);
       },
     },
@@ -429,7 +429,7 @@ export const CHARACTERS: Character[] = [
         ]);
         if (choice !== 'move5') return;
         ctx.setFlatMoveOverride(self, 5);
-        ctx.log(`🦵 ${ctx.describe(self)} strides forward exactly 5 spaces!`);
+        ctx.log(`${ctx.describe(self)} strides forward exactly 5 spaces!`);
       },
     },
   },
@@ -451,7 +451,7 @@ export const CHARACTERS: Character[] = [
       onTurnStart: (ctx, self) => {
         if (isAloneInLast(ctx, self)) {
           ctx.grantBronzeChip(self);
-          ctx.log(`🥺 ${ctx.describe(self)} is alone in last place and earns a sympathy chip.`);
+          ctx.log(`${ctx.describe(self)} is alone in last place and earns a sympathy chip.`);
         }
       },
     },
@@ -471,7 +471,7 @@ export const CHARACTERS: Character[] = [
           ]);
           if (choice !== 'yes') break;
           current = 1 + Math.floor(Math.random() * 6);
-          ctx.log(`🎩 ${ctx.describe(self)} waves a wand and rerolls: ${current}!`);
+          ctx.log(`${ctx.describe(self)} waves a wand and rerolls: ${current}!`);
         }
         return current;
       },
@@ -492,7 +492,7 @@ export const CHARACTERS: Character[] = [
           others.map((r) => ({ label: ctx.describe(r.characterId), value: r.characterId })),
         );
         ctx.custom[self] = { ...ctx.custom[self], mastermindPredictedWinner: choice };
-        ctx.log(`♟️ ${ctx.describe(self)} secretly predicts ${ctx.describe(choice)} will win!`);
+        ctx.log(`${ctx.describe(self)} secretly predicts ${ctx.describe(choice)} will win!`);
       },
     },
   },
@@ -514,10 +514,10 @@ export const CHARACTERS: Character[] = [
           .getAllRacers()
           .filter((r) => r.characterId !== self && !r.finished && r.position === newSelfPos).length;
         if (gathered > 0) {
-          ctx.addRollModifier(self, gathered);
-          ctx.log(`🪩 ${ctx.describe(self)} throws a party! ${gathered} racer(s) join in: +${gathered} to the roll!`);
+          ctx.addRollModifier(self, gathered, self);
+          ctx.log(`${ctx.describe(self)} throws a party! ${gathered} racer(s) join in: +${gathered} to the roll!`);
         } else {
-          ctx.log(`🪩 ${ctx.describe(self)} pulls everyone 1 space closer.`);
+          ctx.log(`${ctx.describe(self)} pulls everyone 1 space closer.`);
         }
       },
     },
@@ -529,7 +529,7 @@ export const CHARACTERS: Character[] = [
     tier: 3,
     abilities: {
       onAnyShareSpace: (ctx, self) => {
-        ctx.log(`🌹 ${ctx.describe(self)} swoons at the sight of new friends and drifts forward 2!`);
+        ctx.log(`${ctx.describe(self)} swoons at the sight of new friends and drifts forward 2!`);
         void ctx.move(self, 2);
       },
     },
@@ -556,7 +556,7 @@ export const CHARACTERS: Character[] = [
         );
         if (choice === 'stay') return;
         await ctx.setPosition(self, Number(choice));
-        ctx.log(`🛞 ${ctx.describe(self)} warps in as the extra wheel!`);
+        ctx.log(`${ctx.describe(self)} warps in as the extra wheel!`);
       },
     },
   },
@@ -569,7 +569,7 @@ export const CHARACTERS: Character[] = [
       onRaceSetup: async (ctx, self) => {
         const winners = [...new Set(ctx.getPreviousWinnerBaseIds())].filter((id) => id !== 'twins');
         if (winners.length === 0) {
-          ctx.log(`👯 ${ctx.describe(self)} has no past winners to copy yet.`);
+          ctx.log(`${ctx.describe(self)} has no past winners to copy yet.`);
           return;
         }
         const choice = await ctx.decide(
@@ -578,7 +578,7 @@ export const CHARACTERS: Character[] = [
           winners.map((id) => ({ label: CHARACTER_MAP[id]?.name ?? id, value: id })),
         );
         ctx.custom[self] = { ...ctx.custom[self], borrowedBaseId: choice };
-        ctx.log(`👯 ${ctx.describe(self)} copies the power of ${CHARACTER_MAP[choice]?.name ?? choice}!`);
+        ctx.log(`${ctx.describe(self)} copies the power of ${CHARACTER_MAP[choice]?.name ?? choice}!`);
       },
     },
   },
@@ -591,7 +591,7 @@ export const CHARACTERS: Character[] = [
       onAnyRoll: (ctx, self, roller, roll) => {
         if (roller === self || roll !== 1) return;
         ctx.requestPriorityTurn(self);
-        ctx.log(`⛵ ${ctx.describe(roller)} rolled a 1! ${ctx.describe(self)} sails to the front of the line.`);
+        ctx.log(`${ctx.describe(roller)} rolled a 1! ${ctx.describe(self)} sails to the front of the line.`);
       },
     },
   },
@@ -608,7 +608,7 @@ export const CHARACTERS: Character[] = [
         ]);
         if (choice !== 'yes') return;
         await ctx.setPosition(self, ctx.getRacer(mover).position);
-        ctx.log(`🐟 ${ctx.describe(self)} latches onto ${ctx.describe(mover)} and follows along!`);
+        ctx.log(`${ctx.describe(self)} latches onto ${ctx.describe(mover)} and follows along!`);
       },
     },
   },
@@ -620,14 +620,14 @@ export const CHARACTERS: Character[] = [
     abilities: {
       onRaceSetup: (ctx, self) => {
         for (let i = 0; i < 4; i++) ctx.grantBronzeChip(self);
-        ctx.log(`🪨 ${ctx.describe(self)} shoulders 4 bonus chips before the race even begins.`);
+        ctx.log(`${ctx.describe(self)} shoulders 4 bonus chips before the race even begins.`);
       },
       onRoll: async (ctx, self, roll) => {
         if (roll !== 6) return roll;
         ctx.cancelPendingMove();
         await ctx.setPosition(self, 0);
         ctx.removeBronzeChip(self);
-        ctx.log(`🪨 ${ctx.describe(self)} rolls a 6, and the boulder rolls all the way back to Start! (-1 chip)`);
+        ctx.log(`${ctx.describe(self)} rolls a 6, and the boulder rolls all the way back to Start! (-1 chip)`);
         return roll;
       },
     },
@@ -651,7 +651,7 @@ export const CHARACTERS: Character[] = [
         const selfPos = ctx.getRacer(self).position;
         const ahead = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished && r.position > selfPos).length;
         if (ahead > 0) {
-          ctx.log(`👻 ${ctx.describe(self)} drifts forward ${ahead} space${ahead === 1 ? '' : 's'}, one for each racer ahead!`);
+          ctx.log(`${ctx.describe(self)} drifts forward ${ahead} space${ahead === 1 ? '' : 's'}, one for each racer ahead!`);
           await ctx.move(self, ahead);
         }
       },
@@ -669,7 +669,7 @@ export const CHARACTERS: Character[] = [
         const occupants = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished && r.position === guardPos);
         if (occupants.length >= 2) {
           ctx.setTripped(self, true);
-          ctx.log(`👁️ ${ctx.describe(self)} is surrounded by a crowd and trips!`);
+          ctx.log(`${ctx.describe(self)} is surrounded by a crowd and trips!`);
         }
       },
       adjustLanding: (ctx, self, mover, proposedPosition) => {
@@ -680,7 +680,7 @@ export const CHARACTERS: Character[] = [
         const crossesForward = movingFrom < guardPos && guardPos < proposedPosition;
         const crossesBackward = movingFrom > guardPos && guardPos > proposedPosition;
         if (crossesForward || crossesBackward) {
-          ctx.log(`👁️ ${ctx.describe(self)}'s watchful eye stops ${ctx.describe(mover)} in their tracks!`);
+          ctx.log(`${ctx.describe(self)}'s watchful eye stops ${ctx.describe(mover)} in their tracks!`);
           return guardPos;
         }
         return undefined;
@@ -709,7 +709,7 @@ export const CHARACTERS: Character[] = [
         const target = others.find((r) => r.characterId === targetId) ?? others[0];
         const behind = Math.max(0, ctx.getRacer(self).position - 1);
         await ctx.setPosition(target.characterId, behind);
-        ctx.log(`😱 ${ctx.describe(self)} lets out a wail and warps ${ctx.describe(target.characterId)} behind her!`);
+        ctx.log(`${ctx.describe(self)} lets out a wail and warps ${ctx.describe(target.characterId)} behind her!`);
       },
     },
   },
@@ -721,7 +721,7 @@ export const CHARACTERS: Character[] = [
     abilities: {
       onOtherTurnEnd: async (ctx, self, other, spacesMoved) => {
         if (spacesMoved !== 4) return;
-        ctx.log(`🦖 ${ctx.describe(other)} moved 4 spaces! ${ctx.describe(self)} stomps forward 4 too!`);
+        ctx.log(`${ctx.describe(other)} moved 4 spaces! ${ctx.describe(self)} stomps forward 4 too!`);
         await ctx.move(self, 4);
       },
     },
@@ -735,10 +735,10 @@ export const CHARACTERS: Character[] = [
       onAnyRoll: async (ctx, self, roller, roll) => {
         if (roller === self) return;
         if (roll === 3) {
-          ctx.log(`🐙 ${ctx.describe(roller)} rolled a 3! ${ctx.describe(self)} lashes forward 4 tentacles' worth.`);
+          ctx.log(`${ctx.describe(roller)} rolled a 3! ${ctx.describe(self)} lashes forward 4 tentacles' worth.`);
           await ctx.move(self, 4);
         } else if (roll === 5) {
-          ctx.log(`🐙 ${ctx.describe(roller)} rolled a 5! ${ctx.describe(self)} gets yanked back 4.`);
+          ctx.log(`${ctx.describe(roller)} rolled a 5! ${ctx.describe(self)} gets yanked back 4.`);
           await ctx.move(self, -4);
         }
       },
@@ -752,11 +752,11 @@ export const CHARACTERS: Character[] = [
     abilities: {
       onRaceSetup: (ctx, self) => {
         for (let i = 0; i < 8; i++) ctx.grantBronzeChip(self);
-        ctx.log(`⛄ ${ctx.describe(self)} rolls into the race carrying 8 chips of packed snow.`);
+        ctx.log(`${ctx.describe(self)} rolls into the race carrying 8 chips of packed snow.`);
       },
       onTurnStart: (ctx, self) => {
         ctx.removeBronzeChip(self);
-        ctx.log(`⛄ ${ctx.describe(self)} melts a little and drops 1 chip.`);
+        ctx.log(`${ctx.describe(self)} melts a little and drops 1 chip.`);
       },
     },
   },
@@ -775,7 +775,7 @@ export const CHARACTERS: Character[] = [
           others.map((r) => ({ label: ctx.describe(r.characterId), value: r.characterId })),
         );
         ctx.custom[self] = { ...ctx.custom[self], seerPredictedLast: choice };
-        ctx.log(`🔮 ${ctx.describe(self)} secretly predicts ${ctx.describe(choice)} will finish last!`);
+        ctx.log(`${ctx.describe(self)} secretly predicts ${ctx.describe(choice)} will finish last!`);
       },
     },
   },
@@ -805,7 +805,7 @@ export const CHARACTERS: Character[] = [
       onRoll: (ctx, self, roll) => {
         const prediction = ctx.custom[self]?.oracleSelfPrediction;
         if (typeof prediction === 'number' && prediction === roll) {
-          ctx.log(`🔮 ${ctx.describe(self)} foresaw the roll! Drifts forward 1.`);
+          ctx.log(`${ctx.describe(self)} foresaw the roll! Drifts forward 1.`);
           void ctx.move(self, 1);
         }
         return roll;
@@ -822,7 +822,7 @@ export const CHARACTERS: Character[] = [
         if (roller === self) return;
         const prediction = ctx.custom[self]?.oracleOtherPrediction;
         if (typeof prediction === 'number' && prediction === roll) {
-          ctx.log(`🔮 ${ctx.describe(self)} correctly predicted ${ctx.describe(roller)}'s roll! Drifts forward 1.`);
+          ctx.log(`${ctx.describe(self)} correctly predicted ${ctx.describe(roller)}'s roll! Drifts forward 1.`);
           void ctx.move(self, 1);
         }
       },
@@ -841,11 +841,11 @@ export const CHARACTERS: Character[] = [
         ]);
         if (choice !== 'move6') return;
         ctx.setFlatMoveOverride(self, 6);
-        ctx.log(`👑 ${ctx.describe(self)} commands a royal advance of exactly 6!`);
+        ctx.log(`${ctx.describe(self)} commands a royal advance of exactly 6!`);
       },
       onAnyRoll: async (ctx, self, roller, roll) => {
         if (roller === self || roll !== 6) return;
-        ctx.log(`👑 ${ctx.describe(roller)} rolled a 6! ${ctx.describe(self)} recoils back 4.`);
+        ctx.log(`${ctx.describe(roller)} rolled a 6! ${ctx.describe(self)} recoils back 4.`);
         await ctx.move(self, -4);
       },
     },
@@ -861,7 +861,7 @@ export const CHARACTERS: Character[] = [
         while (total === 1) {
           await new Promise((resolve) => setTimeout(resolve, 200));
           const extra = 1 + Math.floor(Math.random() * 6);
-          ctx.log(`🦏 ${ctx.describe(self)} rolled a 1 and charges on: +${extra}!`);
+          ctx.log(`${ctx.describe(self)} rolled a 1 and charges on: +${extra}!`);
           total += extra;
         }
         return total;
@@ -887,7 +887,7 @@ export const CHARACTERS: Character[] = [
         const passed = Array.isArray(data?.nightOwlPassedThisTurn) ? (data!.nightOwlPassedThisTurn as string[]) : [];
         const others = ctx.getAllRacers().filter((r) => r.characterId !== self && !r.finished);
         if (others.length > 0 && new Set(passed).size >= others.length) {
-          ctx.log(`🌙 ${ctx.describe(self)} slips past everyone in the dark and warps straight to the finish!`);
+          ctx.log(`${ctx.describe(self)} slips past everyone in the dark and warps straight to the finish!`);
           const selfPos = ctx.getRacer(self).position;
           await ctx.move(self, ctx.trackLength - selfPos);
         }
@@ -918,7 +918,7 @@ export const CHARACTERS: Character[] = [
         if (ctx.custom[self]?.cheetahFatigued) {
           ctx.custom[self] = { ...ctx.custom[self], cheetahFatigued: false };
           ctx.setFlatMoveOverride(self, -1);
-          ctx.log(`🐆 ${ctx.describe(self)} is worn out from sprinting and stumbles back 1 space.`);
+          ctx.log(`${ctx.describe(self)} is worn out from sprinting and stumbles back 1 space.`);
           return;
         }
         const choice = await ctx.decide(self, 'Roll normally, or sprint 8 spaces?', [
@@ -928,7 +928,7 @@ export const CHARACTERS: Character[] = [
         if (choice !== 'sprint') return;
         ctx.setFlatMoveOverride(self, 8);
         ctx.custom[self] = { ...ctx.custom[self], cheetahFatigued: true };
-        ctx.log(`🐆 ${ctx.describe(self)} sprints ahead 8 spaces!`);
+        ctx.log(`${ctx.describe(self)} sprints ahead 8 spaces!`);
       },
     },
   },
@@ -948,7 +948,7 @@ export const CHARACTERS: Character[] = [
             .find((r) => r.characterId !== self && !r.finished && !isImmuneRacer(r.characterId) && r.position === selfPos + 1);
           if (!ahead) break;
           await ctx.setPosition(self, ahead.position + 1);
-          ctx.log(`🌀 ${ctx.describe(self)} springs past ${ctx.describe(ahead.characterId)} to land just ahead!`);
+          ctx.log(`${ctx.describe(self)} springs past ${ctx.describe(ahead.characterId)} to land just ahead!`);
           iterations++;
         }
       },
@@ -967,7 +967,7 @@ export const CHARACTERS: Character[] = [
         const distance = otherRacer.position - selfPos;
         if (distance !== 5 && distance !== 6) return;
         await ctx.setPosition(other, selfPos);
-        ctx.log(`🦑 ${ctx.describe(self)} drags ${ctx.describe(other)} back with a tentacle!`);
+        ctx.log(`${ctx.describe(self)} drags ${ctx.describe(other)} back with a tentacle!`);
         await ctx.move(self, 2);
       },
     },
@@ -993,7 +993,7 @@ export const CHARACTERS: Character[] = [
           if (isImmuneRacer(other.characterId) || other.position === leadPosition) continue;
           await ctx.setPosition(other.characterId, leadPosition);
         }
-        ctx.log(`🌪️ ${ctx.describe(self)} unleashes chaos, warping everyone up to 1st place!`);
+        ctx.log(`${ctx.describe(self)} unleashes chaos, warping everyone up to 1st place!`);
         ctx.setFlatMoveOverride(self, 3);
       },
     },
@@ -1010,7 +1010,7 @@ export const CHARACTERS: Character[] = [
       onAnyRoll: (ctx, self, roller, roll) => {
         if (roll !== 1) return;
         void ctx.move(self, 3);
-        ctx.log(`🐌 ${ctx.describe(roller)} rolled a 1! ${ctx.describe(self)} zooms forward 3.`);
+        ctx.log(`${ctx.describe(roller)} rolled a 1! ${ctx.describe(self)} zooms forward 3.`);
       },
     },
   },
@@ -1053,7 +1053,7 @@ export const CHARACTERS: Character[] = [
         const targetBaseId = (ctx.custom[targetId]?.borrowedBaseId as string) ?? baseCharacterId(targetId);
         ctx.custom[self] = { ...ctx.custom[self], borrowedBaseId: targetBaseId };
         ctx.custom[targetId] = { ...ctx.custom[targetId], borrowedBaseId: selfBaseId };
-        ctx.log(`🥼 ${ctx.describe(self)} and ${targetName} swap abilities in a flash of chemistry!`);
+        ctx.log(`${ctx.describe(self)} and ${targetName} swap abilities in a flash of chemistry!`);
       },
     },
   },

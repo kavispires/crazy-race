@@ -28,7 +28,7 @@ export async function useDiceReroll(
 ): Promise<number> {
   runtime.rerollUsedThisTurn = true;
   const newRoll = rollDie();
-  ctx.log(`🎲 ${ctx.describe(requesterCharacterId)} uses Dice's reroll: ${newRoll}!`, 'ability');
+  ctx.log(`${ctx.describe(requesterCharacterId)} uses Dice's reroll: ${newRoll}!`, 'ability');
   const diceId = Object.keys(runtime.racers).find(
     (id) => getCharacter(id).id === 'dice',
   );
@@ -49,7 +49,7 @@ export async function playTurn(
   runtime.rerollUsedThisTurn = false;
   runtime.pendingMoveCancelled = false;
 
-  ctx.log(`▶ ${ctx.describe(characterId)}'s turn (space ${racer.position}/${ctx.trackLength})`, 'turn');
+  ctx.log(`${ctx.describe(characterId)}'s turn (space ${racer.position}/${ctx.trackLength})`, 'turn');
 
   // 1. Passive auras fire for every racer before the active racer acts (skipped entirely if the
   // active racer is immune, e.g. Panda, since it can't be affected by others' abilities).
@@ -70,7 +70,7 @@ export async function playTurn(
   // 3. Handle tripping: skip this turn's move, stand back up, end turn immediately.
   if (racer.tripped) {
     racer.tripped = false;
-    ctx.log(`💫 ${ctx.describe(characterId)} was tripped and skips this turn (standing back up).`, 'move');
+    ctx.log(`${ctx.describe(characterId)} was tripped and skips this turn (standing back up).`, 'move');
     runtime.callbacks.onRacersChange({ ...runtime.racers });
     return { characterId, roll: null, spacesMoved: 0, tripped: true };
   }
@@ -78,6 +78,7 @@ export async function playTurn(
   // 4. Roll (or use a flat override, e.g. Cheerleader's self-penalty).
   let moveValue: number;
   let roll: number | null = null;
+  let adjustmentReason: string | null = null;
   if (racer.flatMoveOverride !== null) {
     moveValue = racer.flatMoveOverride;
     racer.flatMoveOverride = null;
@@ -91,7 +92,9 @@ export async function playTurn(
     }
     roll = rollDie();
     const modifier = racer.rollModifier;
+    const modifierSourceIds = racer.rollModifierSources;
     racer.rollModifier = 0;
+    racer.rollModifierSources = [];
     let adjusted = Math.max(0, roll + modifier);
     const withAbility = await effectiveCharacter(runtime, characterId).abilities.onRoll?.(ctx, characterId, adjusted);
     if (withAbility !== undefined) {
@@ -99,6 +102,10 @@ export async function playTurn(
       notifyAbilityResolve(runtime, ctx, characterId);
     }
     moveValue = adjusted;
+    adjustmentReason =
+      modifier !== 0 && modifierSourceIds.length > 0
+        ? modifierSourceIds.map((id) => getCharacter(id).name).join(', ')
+        : null;
   }
 
   // 4b. Reactive hooks fired to every other racer right after the roll is known
@@ -112,12 +119,13 @@ export async function playTurn(
   }
 
   if (runtime.pendingMoveCancelled) {
-    ctx.log(`🚫 ${ctx.describe(characterId)}'s move is cancelled this turn!`, 'move');
+    ctx.log(`${ctx.describe(characterId)}'s move is cancelled this turn!`, 'move');
     moveValue = 0;
   } else {
+    const reasonSuffix = adjustmentReason ? ` because of ${adjustmentReason}` : '';
     const rollDetail =
-      roll !== null && roll !== moveValue ? ` (rolled ${roll}, adjusted to ${moveValue})` : '';
-    ctx.log(`🎲 ${ctx.describe(characterId)} moves ${moveValue} space${moveValue === 1 ? '' : 's'}${rollDetail}.`, 'move');
+      roll !== null && roll !== moveValue ? ` (rolled ${roll}, adjusted to ${moveValue}${reasonSuffix})` : '';
+    ctx.log(`${ctx.describe(characterId)} moves ${moveValue} space${moveValue === 1 ? '' : 's'}${rollDetail}.`, 'move');
     await ctx.move(characterId, moveValue);
   }
 
@@ -131,7 +139,7 @@ export async function playTurn(
   // 5b. Genius: if it correctly predicted its own roll, it takes another turn.
   if (runtime.custom[characterId]?.geniusExtraTurn) {
     delete runtime.custom[characterId].geniusExtraTurn;
-    ctx.log(`🧠 ${ctx.describe(characterId)} predicted the roll correctly and goes again!`, 'ability');
+    ctx.log(`${ctx.describe(characterId)} predicted the roll correctly and goes again!`, 'ability');
     ctx.requestPriorityTurn(characterId);
   }
 

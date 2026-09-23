@@ -72,6 +72,8 @@ export interface RacerState {
   finished: boolean;
   finishOrder: number | null;
   rollModifier: number; // persists until consumed
+  /** Character ids whose ability contributed to `rollModifier`, for log attribution (e.g. "adjusted to 0 because of Slime"). */
+  rollModifierSources: string[];
   skipNextRoll: boolean;
   spacesMovedLastTurn: number;
   /** If set, overrides the die roll entirely with this flat move value (consumed once). */
@@ -86,7 +88,8 @@ export interface AbilityContext {
   eliminate: (characterId: string) => void;
   getRacer: (characterId: string) => RacerState;
   getAllRacers: () => RacerState[];
-  addRollModifier: (characterId: string, amount: number) => void;
+  /** `sourceCharacterId` (usually the ability's own `self`) is recorded for log attribution when the roll is later adjusted. */
+  addRollModifier: (characterId: string, amount: number, sourceCharacterId?: string) => void;
   setFlatMoveOverride: (characterId: string, value: number) => void;
   log: (message: string, kind?: LogKind) => void;
   /** Human-readable "Character Name (Owner)" label for use in log messages. */
